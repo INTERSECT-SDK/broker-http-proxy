@@ -1,0 +1,25 @@
+[workspace]
+members = ["broker-2-http", "http-2-broker", "shared-deps"]
+# Only check / build main crates by default (check all with `--workspace`)
+default-members = ["broker-2-http", "http-2-broker",]
+resolver = "2"
+
+# shared dependencies across all applications
+[workspace.dependencies]
+anyhow = "1.0.86"
+async-stream = "0.3.5"
+amqprs = { version = "1.6.2", features = ["traces"] }
+config = { version = "0.14.0", default-features = false, features = ["yaml"] }
+futures = "0.3.30"
+secrecy = { version = "0.8.0", features = ["serde"] }
+serde = { version = "1.0.203", features = ["derive"] }
+serde-aux = "4.5.0"
+serde_json = { version = "1.0.118", features = ["raw_value"] }
+tokio = { version = "1.38.0", features = ["full"] }
+tokio-stream = "0.1.15"
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["registry", "env-filter"] }
+
+[workspace.package]
+version = "0.1.0"
+publish = false

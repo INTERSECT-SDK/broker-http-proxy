@@ -1,0 +1,30 @@
+[package]
+name = "http-2-broker"
+version = "0.1.0"
+edition = "2021"
+publish = false
+default-run = "http-2-broker"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+path = "src/main.rs"
+name = "http-2-broker"
+
+[dependencies]
+anyhow = { workspace = true }
+async-stream = { workspace = true }
+amqprs = { workspace = true }
+config = { workspace = true }
+futures = { workspace = true }
+serde = { workspace = true }
+serde-aux = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tracing = { workspace = true }
+intersect-ingress-proxy-common = { path = "../shared-deps", version = "0.1.0" }
+sse-client = { version = "1.1.1", features = ["native-tls"] }
+# TODO this might be a better library to use in the future
+# eventsource-client = "0.12.2"

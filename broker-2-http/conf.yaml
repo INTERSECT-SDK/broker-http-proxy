@@ -1,0 +1,12 @@
+# local development config file for the HTTP server
+app_port: 8080
+broker:
+  username: intersect_username
+  password: intersect_password
+  host: "127.0.0.1"
+  # note: differs from other config file (two separate brokers used)
+  port: 5672
+# use amqp topic notation
+topic_prefix: "organization.facility.system"  # CHANGE THIS PER DEPLOYMENT!!!
+log_level: "debug"
+production: false
