@@ -9,7 +9,9 @@ use http_2_broker::configuration::{get_configuration, Settings};
 use intersect_ingress_proxy_common::intersect_messaging::{
     extract_eventsource_data, INTERSECT_MESSAGE_EXCHANGE,
 };
-use intersect_ingress_proxy_common::protocols::amqp::{get_channel, get_connection, make_exchange};
+use intersect_ingress_proxy_common::protocols::amqp::{
+    get_channel, get_connection, is_name_compliant, make_exchange,
+};
 use intersect_ingress_proxy_common::signals::wait_for_os_signal;
 use intersect_ingress_proxy_common::telemetry::{
     get_json_subscriber, get_pretty_subscriber, init_subscriber,
@@ -26,6 +28,13 @@ async fn send_message(message: String, broker_data: Arc<BrokerData>) {
         return;
     }
     let (topic, data) = es_data_result.unwrap();
+    if !is_name_compliant(&topic) {
+        tracing::warn!(
+            "{} is not a valid AMQP topic name, will not attempt publish",
+            topic
+        );
+        return;
+    }
 
     // TODO - we'd ideally like to potentially reuse the channel instead of closing it every time
     // see https://github.com/rdoetjes/rabbit_systeminfo/blob/master/systeminfo/src/main.rs#L84 as an example
