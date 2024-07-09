@@ -21,7 +21,11 @@ struct BrokerData {
 }
 
 async fn send_message(message: String, broker_data: Arc<BrokerData>) {
-    let (topic, data) = extract_eventsource_data(&message);
+    let es_data_result = extract_eventsource_data(&message);
+    if es_data_result.is_err() {
+        return;
+    }
+    let (topic, data) = es_data_result.unwrap();
 
     // TODO - we'd ideally like to potentially reuse the channel instead of closing it every time
     // see https://github.com/rdoetjes/rabbit_systeminfo/blob/master/systeminfo/src/main.rs#L84 as an example

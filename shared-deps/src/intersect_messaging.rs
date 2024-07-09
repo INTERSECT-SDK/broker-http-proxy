@@ -43,13 +43,24 @@ pub fn make_eventsource_data(channel: &str, msg_str: &str) -> String {
     format!("{}{}{}", channel, DELIMITER, msg_str)
 }
 
+#[derive(Debug)]
+pub struct ExtractEventSourceErr;
+
+impl std::fmt::Display for ExtractEventSourceErr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "event source data was not properly formatted")
+    }
+}
+
+impl std::error::Error for ExtractEventSourceErr {}
+
 /// returns a tuple of the channel string and the event source string
-pub fn extract_eventsource_data(data: &str) -> (String, String) {
+pub fn extract_eventsource_data(data: &str) -> Result<(String, String), ExtractEventSourceErr> {
     match data.split_once(DELIMITER) {
-        Some((channel, msg_str)) => (channel.to_owned(), msg_str.to_owned()),
+        Some((channel, msg_str)) => Ok((channel.to_owned(), msg_str.to_owned())),
         None => {
             tracing::warn!("Data from SSE does not match expected format: {}", data);
-            (String::new(), String::new())
+            Err(ExtractEventSourceErr)
         }
     }
 }
@@ -99,7 +110,7 @@ mod tests {
         // our delimiter only adds one byte to all the data we want to push through
         assert!(encoded.len() == channel.len() + message.len() + 1);
 
-        let (decoded_channel, decoded_message) = extract_eventsource_data(&encoded);
+        let (decoded_channel, decoded_message) = extract_eventsource_data(&encoded).unwrap();
         assert_eq!(channel, decoded_channel);
         assert_eq!(message, decoded_message);
     }
