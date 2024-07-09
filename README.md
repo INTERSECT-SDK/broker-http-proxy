@@ -32,7 +32,7 @@ You will need two message brokers and two instances of this application running 
 These instructions assume you are using the docker compose configuration and the default `conf.yaml` configurations for each.
 
 1) Make sure that you have both applications started (do NOT start more than 1 of each)
-2) Login to localhost:15672, username `intersect_username`, password `intersect_password`, click on `exchanges`, expand the `Add a new exchange` section, give it the name `intersect-messages`, set the type to `topic`, other settings are fine (you can set durability to `transient` but it's probably better to just nuke your Docker volume), click `Add exchange`.
+2) Login to localhost:15673, username `intersect_username`, password `intersect_password`, click on `exchanges`, make sure the `intersect-messages` exchange exists (this one gets created by `http-2-broker` on startup).
 3) Go to the `Queues and streams` tab, expand `Add a new queue` section, set `Name` field as whatever you want, other settings are fine, click `Add queue`
 4) Click on the queue you just created, expand `Bindings` section, see `Add binding to queue` section, set `From exchange` to equal `intersect-messages`, set `Routing key` to be `organization.facility.system.subsystem.service.userspace` , click `Bind queue`
 

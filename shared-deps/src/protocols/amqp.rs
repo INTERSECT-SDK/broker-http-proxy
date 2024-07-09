@@ -1,12 +1,12 @@
 use amqprs::{
     callbacks::{DefaultChannelCallback, DefaultConnectionCallback},
-    channel::Channel,
+    channel::{Channel, ExchangeDeclareArguments},
     connection::{Connection, OpenConnectionArguments},
 };
 use secrecy::ExposeSecret;
 use std::time::Duration;
 
-use crate::configuration::BrokerSettings;
+use crate::{configuration::BrokerSettings, intersect_messaging::INTERSECT_MESSAGE_EXCHANGE};
 
 /// Connect to the broker, attempt to reconnect if failed initially.
 /// if retries = 0, retry forever
@@ -66,7 +66,21 @@ pub async fn get_channel(connection: &Connection) -> Channel {
     channel
 }
 
-/// make sure that "name" is a valid AMQP exchange name (for publishing on)
+/// logic for declaring the INTERSECT exchange - need to do this in case no services/systems have declared it
+///
+/// Returns:
+///   - result of whether or not the exchange declaration was successful
+pub async fn make_exchange(channel: &Channel) -> Result<(), amqprs::error::Error> {
+    channel
+        .exchange_declare(
+            ExchangeDeclareArguments::new(INTERSECT_MESSAGE_EXCHANGE, "topic")
+                .durable(true)
+                .finish(),
+        )
+        .await
+}
+
+/// make sure that "name" is a valid AMQP exchange or queue name (for publishing on)
 pub fn is_name_compliant(name: &str) -> bool {
     name.len() < 128
         && !name

@@ -1,15 +1,15 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use amqprs::channel::ExchangeDeclareArguments;
 use amqprs::{channel::BasicPublishArguments, connection::Connection, BasicProperties};
-use sse_client::EventSource;
+use futures::StreamExt;
+use reqwest_eventsource::{Event, EventSource};
 
 use http_2_broker::configuration::{get_configuration, Settings};
 use intersect_ingress_proxy_common::intersect_messaging::{
     extract_eventsource_data, INTERSECT_MESSAGE_EXCHANGE,
 };
-use intersect_ingress_proxy_common::protocols::amqp::{get_channel, get_connection};
+use intersect_ingress_proxy_common::protocols::amqp::{get_channel, get_connection, make_exchange};
 use intersect_ingress_proxy_common::signals::wait_for_os_signal;
 use intersect_ingress_proxy_common::telemetry::{
     get_json_subscriber, get_pretty_subscriber, init_subscriber,
@@ -28,15 +28,6 @@ async fn send_message(message: String, broker_data: Arc<BrokerData>) {
     // we NEED to explicitly close the channel, or else problems on the broker may develop
     let channel = get_channel(&broker_data.connection).await;
 
-    // NOTE - we MUST declare this exchange, in case a message is sent to this system but no scientific services are deployed
-    channel
-        .exchange_declare(
-            ExchangeDeclareArguments::new(INTERSECT_MESSAGE_EXCHANGE, "topic")
-                .durable(true)
-                .finish(),
-        )
-        .await
-        .expect("Could not declare exchange on channel");
     let args = BasicPublishArguments::new(INTERSECT_MESSAGE_EXCHANGE, &topic);
     // NOTE: the publish() function takes ownership of the string, if you don't care about logging then don't clone
     match channel
@@ -60,43 +51,48 @@ async fn send_message(message: String, broker_data: Arc<BrokerData>) {
     };
 }
 
-async fn event_source_loop(configuration: &Settings, broker_data: Arc<BrokerData>) {
-    // TODO this is probably not the best approach, but it seems to work
-    let async_bridge = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(2)
-        .enable_all()
-        .build()
-        .unwrap();
-
-    let mut es_res = EventSource::new(&configuration.other_proxy_url);
-    let mut retries = 0_u32;
-    while es_res.is_err() {
-        if retries > 10 {
-            tracing::error!("Cannot connect to event source URL, stopping application...");
-            std::process::exit(1);
-        }
-        retries += 1;
-        std::thread::sleep(Duration::from_millis(2000));
-        es_res = EventSource::new(&configuration.other_proxy_url);
+/// Return value - exit code to use
+async fn event_source_loop(configuration: &Settings, broker_data: Arc<BrokerData>) -> i32 {
+    let mut es = EventSource::get(&configuration.other_proxy_url);
+    let mut rc = 0;
+    loop {
+        tokio::select! {
+            // got data back from web server
+            evt = es.next() => {
+                match evt {
+                    None => {
+                        // probably isn't reachable
+                        tracing::error!("couldn't get next event");
+                        rc = 1;
+                        break;
+                    },
+                    Some(event) => {
+                        match event {
+                            Ok(Event::Open) => {
+                                tracing::info!("connected to {}", &configuration.other_proxy_url);
+                            },
+                            Ok(Event::Message(message)) => {
+                                send_message(message.data, broker_data.clone()).await;
+                            },
+                            Err(err) => {
+                                // will happen if we can't connect to the endpoint OR if the endpoint drops us
+                                tracing::error!(error = ?err, "Event source error --- {}", err);
+                                rc = 1;
+                                break;
+                            },
+                        }
+                    },
+                }
+            },
+            // OS kill signal
+            _ = wait_for_os_signal() => {
+                break;
+            },
+        };
     }
-    tracing::info!("connected");
-    let event_source = es_res.unwrap();
-    // TODO would be ideal for on_message to be async as well
-    event_source.on_message(move |message| {
-        tracing::debug!("New message event --- {:?}", message);
-        async_bridge.spawn(send_message(message.data, broker_data.clone()));
-    });
-    event_source.add_event_listener("error", |error| {
-        tracing::error!("Event source error --- {:?}", error);
-        // TODO is this the best way to handle these? This usually implies a misconfiguration.
-        // We may also get these if the web server goes down.
-        std::process::exit(1);
-    });
+    es.close();
 
-    wait_for_os_signal().await;
-    tracing::info!("Attempting graceful shutdown...");
-    tracing::info!("No longer listening for events over HTTP, will wait 3 seconds to publish remaining messages");
-    event_source.close();
+    rc
 }
 
 #[tokio::main]
@@ -117,9 +113,30 @@ pub async fn main() {
     }
 
     let connection = get_connection(&configuration.broker, 10).await;
+
+    // try to declare the exchange on the broker, fail if not
+    // do this outside of the hot loop, we should not try to declare the exchange on every message
+    {
+        let channel = get_channel(&connection).await;
+        let exchange_result = make_exchange(&channel).await;
+        match channel.close().await {
+            Ok(_) => {}
+            Err(e) => {
+                tracing::warn!(error = ?e, "could not close channel");
+            }
+        };
+        if exchange_result.is_err() {
+            tracing::error!("could not create exchange");
+            std::process::exit(1);
+        }
+    }
+
     let broker_data = Arc::new(BrokerData { connection });
 
-    event_source_loop(&configuration, broker_data.clone()).await;
+    let rc = event_source_loop(&configuration, broker_data.clone()).await;
+
+    tracing::info!("Attempting graceful shutdown: No longer listening for events over HTTP, will wait 3 seconds to publish remaining messages");
+    tokio::time::sleep(Duration::from_secs(3)).await;
     // TODO this has a lifetime issue, can't move it out of the Arc
     // closing the connection is not quite as important, it won't cause issues on the broker and it should be auto-dropped anyways
     // match connection.close().await {
@@ -128,6 +145,6 @@ pub async fn main() {
     //         tracing::warn!("Couldn't close connection");
     //     }
     // };
-    tokio::time::sleep(Duration::from_secs(3)).await;
     tracing::info!("process gracefully shutdown");
+    std::process::exit(rc);
 }

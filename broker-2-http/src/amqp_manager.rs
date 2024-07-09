@@ -1,8 +1,5 @@
 use amqprs::{
-    channel::{
-        BasicConsumeArguments, Channel, ExchangeDeclareArguments, QueueBindArguments,
-        QueueDeclareArguments,
-    },
+    channel::{BasicConsumeArguments, Channel, QueueBindArguments, QueueDeclareArguments},
     connection::Connection,
 };
 use std::sync::Arc;
@@ -10,7 +7,7 @@ use uuid::Uuid;
 
 use crate::{amqp_consumer::AmqpConsumer, broadcaster::Broadcaster, configuration::Settings};
 use intersect_ingress_proxy_common::intersect_messaging::INTERSECT_MESSAGE_EXCHANGE;
-use intersect_ingress_proxy_common::protocols::amqp::{get_channel, get_connection};
+use intersect_ingress_proxy_common::protocols::amqp::{get_channel, get_connection, make_exchange};
 
 /// AmqpManager is meant to be a long-living object which contains connection/channel data of a consumer.
 #[derive(Clone)]
@@ -26,12 +23,7 @@ impl AmqpManager {
         let channel = get_channel(&connection).await;
 
         // TODO - we probably don't need to declare this exchange, since we are always subscribing to messages on this channel.
-        channel
-            .exchange_declare(
-                ExchangeDeclareArguments::new(INTERSECT_MESSAGE_EXCHANGE, "topic")
-                    .durable(true)
-                    .finish(),
-            )
+        make_exchange(&channel)
             .await
             .expect("Could not declare exchange on channel");
 

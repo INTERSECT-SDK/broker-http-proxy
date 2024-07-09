@@ -18,7 +18,7 @@ impl Broadcaster {
     /// The broadcaster manages its producer but does not manage its consumers
     pub fn new() -> Arc<Self> {
         // TODO may be able to get away with smaller capacity
-        let (tx, _) = broadcast::channel(16);
+        let (tx, _) = broadcast::channel(1);
         Arc::new(Broadcaster { fanout: tx })
     }
 

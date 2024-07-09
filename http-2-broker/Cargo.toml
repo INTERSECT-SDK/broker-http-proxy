@@ -25,6 +25,4 @@ tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tracing = { workspace = true }
 intersect-ingress-proxy-common = { path = "../shared-deps", version = "0.1.0" }
-sse-client = { version = "1.1.1", features = ["native-tls"] }
-# TODO this might be a better library to use in the future
-# eventsource-client = "0.12.2"
+reqwest-eventsource = "0.6.0"
