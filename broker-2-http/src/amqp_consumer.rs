@@ -1,5 +1,5 @@
 use amqprs::{
-    channel::{BasicAckArguments, /*BasicNackArguments,*/ Channel},
+    channel::{BasicAckArguments, Channel},
     consumer::AsyncConsumer,
     BasicProperties, Deliver,
 };
@@ -39,41 +39,37 @@ impl AsyncConsumer for AmqpConsumer {
         _basic_properties: BasicProperties,
         content: Vec<u8>,
     ) {
-        // This is the major difference between our implementations and what the SDK does - we don't necessarily want to ACK
-        // this is because we will be seeing messages we DON'T want to "pass through", and thus we have no business consuming them ourselves.
-        let mut should_ack = false;
+        // This is the major difference between our implementations and what the SDK does - we don't necessarily want to ACK (but by default we will)
+        // we will always manually ACK unless nobody was available to listen to our message, in which case we should NACK and requeue.
+        let mut should_ack = true;
         if deliver.redelivered() {
             tracing::warn!("message was redelivered");
         }
-        tracing::debug!("consume delivery {} on channel {}", deliver, channel,);
+        tracing::debug!("consume delivery {}", deliver);
         match String::from_utf8(content) {
-            Ok(utf8_data) => match should_message_passthrough(&utf8_data, &self.topic_prefix) {
-                Err(e) => {
-                    tracing::error!(error = ?e, "message is valid UTF-8 but not INTERSECT JSON");
-                }
-                Ok(false) => {
-                    tracing::warn!(
-                        "got probable duplicate message on channel {}, ignoring",
-                        channel
-                    );
-                }
-                Ok(true) => {
-                    let topic = deliver.routing_key();
-                    let event = make_eventsource_data(topic, &utf8_data);
-                    tracing::debug!(
-                        "consume delivery {} on channel {}, data: {}",
-                        deliver,
-                        channel,
-                        event,
-                    );
-                    // TODO handle this better later, see broadcast() documentation for details.
-                    if self.broadcaster.broadcast(&event) > 0 {
-                        should_ack = true;
-                    } else {
-                        tracing::warn!("Broadcaster did not broadcast to anybody");
+            Ok(utf8_data) => {
+                tracing::debug!("raw message data: {}", &utf8_data);
+                match should_message_passthrough(&utf8_data, &self.topic_prefix) {
+                    Err(e) => {
+                        tracing::error!(error = ?e, "message is valid UTF-8 but not INTERSECT JSON");
+                    }
+                    Ok(false) => {
+                        tracing::warn!(
+                            "message source is not from this system, will not broadcast it"
+                        );
+                    }
+                    Ok(true) => {
+                        let topic = deliver.routing_key();
+                        let event = make_eventsource_data(topic, &utf8_data);
+                        tracing::debug!("consume delivery {} , data: {}", deliver, event,);
+                        // TODO handle this better later, see broadcast() documentation for details.
+                        if self.broadcaster.broadcast(&event) == 0 {
+                            tracing::warn!("Broadcaster did not broadcast to anybody");
+                            should_ack = false;
+                        }
                     }
                 }
-            },
+            }
             Err(e) => {
                 tracing::error!(error = ?e, "message data is not UTF-8, cannot be forwarded over SSE");
             }
@@ -81,26 +77,26 @@ impl AsyncConsumer for AmqpConsumer {
 
         if !self.auto_ack {
             if should_ack {
-                tracing::debug!("ack to delivery {} on channel {}", deliver, channel);
+                tracing::debug!("ack to delivery {}", deliver);
                 let args = BasicAckArguments::new(deliver.delivery_tag(), false);
                 match channel.basic_ack(args).await {
                     Ok(_) => {}
                     Err(e) => tracing::error!(error = ?e, "manual ack did not work"),
                 };
             } else {
-                // TODO determine ack/nack logic later
+                // We don't acknowledge or reject the message, so we immediately get the message back.
                 tracing::warn!(
-                    "Some clients probably did not get delivery {} on channel {}",
+                    "Some clients probably did not get delivery {}, not acknowledging the message",
                     deliver,
-                    channel
                 );
-                //     tracing::debug!("nack to delivery {} on channel {}", deliver, channel);
-                //     // TODO should we nack here or just do nothing?
-                //     let args = BasicNackArguments::new(deliver.delivery_tag(), false, false);
-                //     match channel.basic_nack(args).await {
-                //         Ok(_) => {}
-                //         Err(e) => tracing::error!(error = ?e, "manual nack did not work"),
-                //     };
+                // TODO - if we're able to determine SPECIFIC clients who did/did not get it, we may want to explicitly reject the message.
+                // match channel
+                //     .basic_reject(BasicRejectArguments::new(deliver.delivery_tag(), true))
+                //     .await
+                // {
+                //     Ok(_) => {}
+                //     Err(e) => tracing::error!(error = ?e, "manual nack did not work"),
+                // };
             }
         }
     }
