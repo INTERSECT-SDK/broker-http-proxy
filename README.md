@@ -27,6 +27,14 @@ You will need two message brokers and two instances of this application running 
 2) In terminal 1, run broker-2-http: `APP_CONFIG_FILE=broker-2-http/conf.yaml cargo run --bin broker-2-http`
 3) In terminal 2, run http-2-broker (will not work until broker-2-http is initialized): `APP_CONFIG_FILE=http-2-broker/conf.yaml cargo run --bin http-2-broker`
 
+## Application Configuration (primarily for DevOps)
+
+Common configuration structures can be found in `shared-deps/src/configuration.rs` . The `get_configuration()` function is what will be called to initialize the configuration logic.
+
+Specific configuration structs are in `broker-2-http/src/configuration.rs` and `http-2-broker/src/configuration.rs` .
+
+## Setup
+
 ### Using the RabbitMQ web management UIs
 
 These instructions assume you are using the docker compose configuration and the default `conf.yaml` configurations for each.

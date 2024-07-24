@@ -1,11 +1,13 @@
-use broker_2_http::{configuration::get_configuration, startup::Application};
+use broker_2_http::{configuration::Settings, startup::Application};
+
+use intersect_ingress_proxy_common::configuration::get_configuration;
 use intersect_ingress_proxy_common::telemetry::{
     get_json_subscriber, get_pretty_subscriber, init_subscriber,
 };
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let configuration = get_configuration().expect("Failed to read configuration");
+    let configuration = get_configuration::<Settings>().expect("Failed to read configuration");
 
     // Start logging
     if configuration.production {

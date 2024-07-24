@@ -1,0 +1,8 @@
+apiVersion: v2
+name: broker-http-proxy
+description: "Shared Helm chart for all broker/http gateway services"
+version: 0.1.0
+dependencies:
+  - name: common
+    repository: oci://registry-1.docker.io/bitnamicharts
+    version: "^2.9.1"

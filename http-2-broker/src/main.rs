@@ -5,7 +5,8 @@ use amqprs::{channel::BasicPublishArguments, connection::Connection, BasicProper
 use futures::StreamExt;
 use reqwest_eventsource::{Event, EventSource};
 
-use http_2_broker::configuration::{get_configuration, Settings};
+use http_2_broker::configuration::Settings;
+use intersect_ingress_proxy_common::configuration::get_configuration;
 use intersect_ingress_proxy_common::intersect_messaging::{
     extract_eventsource_data, INTERSECT_MESSAGE_EXCHANGE,
 };
@@ -110,7 +111,7 @@ async fn event_source_loop(configuration: &Settings, broker_data: Arc<BrokerData
 
 #[tokio::main]
 pub async fn main() {
-    let configuration = get_configuration().expect("Failed to read configuration");
+    let configuration = get_configuration::<Settings>().expect("Failed to read configuration");
 
     // Start logging
     if configuration.production {
