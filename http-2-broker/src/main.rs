@@ -136,11 +136,12 @@ pub async fn main() {
         match channel.close().await {
             Ok(_) => {}
             Err(e) => {
-                tracing::warn!(error = ?e, "could not close channel");
+                tracing::warn!(error = ?e, "could not close channel after making exchange");
             }
         };
         if exchange_result.is_err() {
-            tracing::error!("could not create exchange");
+            let err = exchange_result.unwrap_err();
+            tracing::error!("could not create exchange: {}", err);
             std::process::exit(1);
         }
     }

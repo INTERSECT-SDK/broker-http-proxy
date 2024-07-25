@@ -35,7 +35,15 @@ pub struct Application {
 
 impl Application {
     pub async fn build(configuration: Settings) -> Result<(Self, AmqpManager), anyhow::Error> {
-        let address = format!("0.0.0.0:{}", configuration.app_port);
+        let address = format!(
+            "{}:{}",
+            if configuration.production {
+                "0.0.0.0"
+            } else {
+                "127.0.0.1"
+            },
+            configuration.app_port
+        );
         let listener = TcpListener::bind(address).await?;
         let port = listener.local_addr().unwrap().port();
         let (server, amqp_manager) = run(listener, &configuration).await?;
