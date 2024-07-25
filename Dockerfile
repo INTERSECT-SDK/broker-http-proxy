@@ -2,6 +2,9 @@
 # https://www.lpalmieri.com/posts/fast-rust-docker-builds/#cargo-chef for an in-depth explanation
 FROM lukemathwalker/cargo-chef:latest-rust-1 AS chef
 WORKDIR /app
+# Force rustup to sync the toolchain in the base layer, so it doesn't happen more than once.
+COPY rust-toolchain.toml .
+RUN cargo --version
 
 # the checksum of recipe.json will only change if the dependency tree changes
 FROM chef AS planner
@@ -23,5 +26,6 @@ RUN cargo build --release --bin ${BIN_NAME}
 FROM debian:stable-slim AS runtime
 ARG BIN_NAME
 WORKDIR /app
-COPY --from=builder /app/target/release/${BIN_NAME} /usr/local/bin/app
-ENTRYPOINT ["/usr/local/bin/app"]
+COPY --from=builder /app/target/release/${BIN_NAME} /app/bin
+ENV PROXYAPP_PRODUCTION "true"
+ENTRYPOINT ["/app/bin"]
