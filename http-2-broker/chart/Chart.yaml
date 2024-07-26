@@ -1,6 +1,6 @@
 apiVersion: v2
-name: broker-http-proxy
-description: "Shared Helm chart for all broker/http gateway services"
+name: http-2-broker
+description: "Subscribe to events over HTTP and publish them on a local broker"
 version: 0.1.0
 dependencies:
   - name: common

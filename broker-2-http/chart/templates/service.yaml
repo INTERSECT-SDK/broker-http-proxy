@@ -1,8 +1,7 @@
-{{- if eq .Values.app.name "broker-2-http" }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ template "common.names.fullname" . }}-{{ .Values.app.name }}
+  name: {{ template "common.names.fullname" . }}
   namespace: {{ include "common.names.namespace" . | quote }}
   labels: {{- include "common.labels.standard" . | nindent 4 }}
     {{- if .Values.commonLabels }}
@@ -45,4 +44,3 @@ spec:
       nodePort: {{ .Values.service.nodePort }}
       {{- end }}
   selector: {{- include "common.labels.matchLabels" . | nindent 4 }}
-{{- end }}

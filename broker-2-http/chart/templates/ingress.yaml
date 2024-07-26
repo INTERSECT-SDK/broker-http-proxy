@@ -1,5 +1,5 @@
-{{- if and .Values.ingress.enabled (eq .Values.app.name "broker-2-http") -}}
-{{- $fullName := include "intersect-broker-http-proxy.fullname" . -}}
+{{- if .Values.ingress.enabled -}}
+{{- $fullName := include "intersect-broker-2-http.fullname" . -}}
 {{- $svcPort := .Values.service.port -}}
 {{- if semverCompare ">=1.19-0" .Capabilities.KubeVersion.GitVersion -}}
 apiVersion: networking.k8s.io/v1a1
@@ -8,7 +8,7 @@ apiVersion: networking.k8s.io/v1a1
 {{- end }}
 kind: Ingress
 metadata:
-  name: {{ template "common.names.fullname" . }}-{{ .Values.app.name }}
+  name: {{ template "common.names.fullname" . }}
   namespace: {{ include "common.names.namespace" . | quote }}
   labels: {{- include "common.labels.standard" . | nindent 4 }}
     {{- if .Values.commonLabels }}
@@ -39,7 +39,7 @@ spec:
             {{- if eq "true" (include "common.ingress.supportsPathType" .) }}
             pathType: {{ .Values.ingress.pathType }}
             {{- end }}
-            backend: {{- include "common.ingress.backend" (dict "serviceName" (printf "%s-%s" (include "common.names.fullname" .) .Values.app.name) "servicePort" "http" "context" $)  | nindent 14 }}
+            backend: {{- include "common.ingress.backend" (dict "serviceName" (include "common.names.fullname" .) "servicePort" "http" "context" $)  | nindent 14 }}
     {{- end }}
     {{- range .Values.ingress.extraHosts }}
     - host: {{ .name | quote }}
@@ -49,7 +49,7 @@ spec:
             {{- if eq "true" (include "common.ingress.supportsPathType" $) }}
             pathType: {{ default "ImplementationSpecific" .pathType }}
             {{- end }}
-            backend: {{- include "common.ingress.backend" (dict "serviceName" (printf "%s-%s" (include "common.names.fullname" $) .Values.app.name) "servicePort" "http" "context" $) | nindent 14 }}
+            backend: {{- include "common.ingress.backend" (dict "serviceName" (include "common.names.fullname" $) "servicePort" "http" "context" $) | nindent 14 }}
     {{- end }}
     {{- if .Values.ingress.extraRules }}
     {{- include "common.tplvalues.render" (dict "value" .Values.ingress.extraRules "context" $) | nindent 4 }}

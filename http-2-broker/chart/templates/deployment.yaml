@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ template "common.names.fullname" . }}-{{ .Values.app.name }}
+  name: {{ template "common.names.fullname" . }}
   namespace: {{ include "common.names.namespace" . | quote }}
   labels: {{- include "common.labels.standard" . | nindent 4 }}
     {{- if .Values.commonLabels }}
@@ -32,8 +32,8 @@ spec:
       {{- include "common.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) | nindent 8 }}
       {{- end }}      
     spec:
-      serviceAccountName: {{ template "intersect-broker-http-proxy.serviceAccountName" . }}
-      {{- include "intersect-broker-http-proxy.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ template "intersect-http-2-broker.serviceAccountName" . }}
+      {{- include "intersect-http-2-broker.imagePullSecrets" . | nindent 6 }}
       {{- if .Values.hostAliases }}
       hostAliases: {{- include "common.tplvalues.render" ( dict "value" .Values.hostAliases "context" $ ) | nindent 8 }}
       {{- end }}
@@ -72,7 +72,7 @@ spec:
       {{- end }}
       containers:
         - name: {{ .Chart.Name }}
-          image: {{ template "intersect-broker-http-proxy.image" . }}
+          image: {{ template "intersect-http-2-broker.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if .Values.containerSecurityContext.enabled }}
           securityContext: {{- omit .Values.containerSecurityContext "enabled" | toYaml | nindent 12 }}
@@ -87,9 +87,6 @@ spec:
           {{- else if .Values.args }}
           args: {{- include "common.tplvalues.render" (dict "value" .Values.args "context" $) | nindent 12 }}
           {{- end }}
-          ports:
-            - name: http
-              containerPort: {{ .Values.containerPort }}
           env:
             - name: PROXYAPP_PRODUCTION
               value: "true"
@@ -110,15 +107,8 @@ spec:
               value: {{ .Values.app.config.broker.host | quote }}
             - name: PROXYAPP_BROKER__PORT
               value: {{ .Values.app.config.broker.port | quote }}
-            {{- if eq .Values.app.name "broker-2-http" }}
-            - name: PROXYAPP_APP_PORT
-              value: {{ .Values.containerPort | quote }}
-            - name: PROXYAPP_TOPIC_PREFIX
-              value: {{ required "app.config.topic_prefix not set (i.e. 'organization.facility.system')" .Values.app.config.topic_prefix | quote }}
-            {{- else }}
             - name: PROXYAPP_OTHER_PROXY_URL
               value: {{ .Values.app.config.other_proxy_url | quote }}
-            {{- end }}
           envFrom:
             {{- if .Values.extraEnvVarsCM }}
             - configMapRef:
@@ -134,26 +124,12 @@ spec:
           {{- if not .Values.diagnosticMode.enabled }}
           {{- if .Values.customLivenessProbe }}
           livenessProbe: {{- include "common.tplvalues.render" (dict "value" .Values.customLivenessProbe "context" $) | nindent 12 }}
-          {{- else if and .Values.livenessProbe.enabled (eq .Values.app.name "broker-2-http") }}
-          livenessProbe: {{- include "common.tplvalues.render" (dict "value" (omit .Values.livenessProbe "enabled") "context" $) | nindent 12 }}
-            httpGet:
-              path: /healthcheck
-              port: http
           {{- end }}
           {{- if .Values.customReadinessProbe }}
           readinessProbe: {{- include "common.tplvalues.render" (dict "value" .Values.customReadinessProbe "context" $) | nindent 12 }}
-          {{- else if and .Values.readinessProbe.enabled (eq .Values.app.name "broker-2-http") }}
-          readinessProbe: {{- include "common.tplvalues.render" (dict "value" (omit .Values.readinessProbe "enabled") "context" $) | nindent 12 }}
-            httpGet:
-              path: /healthcheck
-              port: http
           {{- end }}
           {{- if .Values.customStartupProbe }}
           startupProbe: {{- include "common.tplvalues.render" (dict "value" .Values.customStartupProbe "context" $) | nindent 12 }}
-          {{- else if and .Values.startupProbe.enabled (eq .Values.app.name "broker-2-http") }}
-          startupProbe: {{- include "common.tplvalues.render" (dict "value" (omit .Values.startupProbe "enabled") "context" $) | nindent 12 }}
-            tcpSocket:
-              port: http
           {{- end }}
           {{- end }}
           {{- if .Values.lifecycleHooks }}

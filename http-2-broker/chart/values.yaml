@@ -1,0 +1,145 @@
+# Default values.
+# most of this structure is consistent with Bitnami's, but there are no RBAC or persistence values.
+
+# global values used by this chart
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+  kubeVersion: ""
+
+### Generic Kubernetes parameters ###
+
+kubeVersion: ""
+nameOverride: ""
+fullnameOverride: ""
+namespaceOverride: ""
+commonLabels: {}
+commonAnnotations: {}
+extraDeploy: [] # dynamic Kubernetes templates
+diagnosticMode:
+  enabled: false
+  command:
+    - sleep
+  args:
+    - infinity
+
+### Container params ###
+
+image:
+  registry: code.ornl.gov:4567
+  #registry: ghcr.io
+  repository: http-2-broker
+  # TODO this tag should be something like "broker-2-http-0.1.0" or "http-2-broker-0.1.0"
+  tag: "0.1.0"
+  digest: ""
+  pullPolicy: ""
+  pullSecrets: []
+
+replicaCount: 1
+
+#livenessProbe: # the application developers should help determine sane default params
+  #enabled: true
+  #initialDelaySeconds: 30
+  #periodSeconds: 5
+  #timeoutSeconds: 10
+  #failureThreshold: 6
+  #successThreshold: 1
+
+#readinessProbe: # the application developers should help determine sane default params
+  #enabled: true
+  #initialDelaySeconds: 5
+  #timeoutSeconds: 3
+  #periodSeconds: 5
+  #failureThreshold: 3
+  #successThreshold: 1
+
+#startupProbe: # the application developers should help determine sane default params
+  #enabled: false
+  #initialDelaySeconds: 30
+  #periodSeconds: 5
+  #timeoutSeconds: 10
+  #failureThreshold: 6
+  #successThreshold: 1
+
+customLivenessProbe: {}
+customReadinessProbe: {}
+customStartupProbe: {}
+
+resources:
+  limits: {}
+  requests: {}
+
+# TODO this probably has to be configured based on the system
+podSecurityContext:
+  enabled: false
+  fsGroup: 1001
+containerSecurityContext:
+  enabled: false
+  runAsUser: 1001
+  runAsNonRoot: true
+  readOnlyRootFilesystem: false
+
+command: []
+args: []
+hostAliases: []
+podLabels: {}
+podAnnotations: {}
+podAffinityPreset: ""
+podAntiAffinityPreset: soft
+
+pdb:
+  create: false
+  minAvailable: 1
+  maxUnavailable: ""
+autoscaling:
+  enabled: false
+  minReplicas: ""
+  maxReplicas: ""
+  targetCPUUtilizationPercentage: ""
+  targetMemoryUtilizationPercentage: ""
+nodeAffinityPreset:
+  type: ""
+  key: ""
+  values: []
+affinity: {}
+nodeSelector: {}
+tolerations: []
+updateStrategy:
+  type: RollingUpdate
+priorityClassName: ""
+topologySpreadConstraints: []
+schedulerName: ""
+terminationGracePeriodSeconds: ""
+lifecycleHooks: {}
+extraEnvVars: []
+extraEnvVarsCM: ""
+extraEnvVarsSecret: ""
+initContainers: []
+sidecars: []
+
+### Kubernetes role stuff
+
+serviceAccount:
+  create: false
+  annotations: {}
+  name: ""
+  automountServiceAccountToken: true
+
+### application stuff
+
+app:
+  logLevel: "info"
+  other_proxy_url: "" # broker-2-http only
+  broker:
+    host: "127.0.0.1"
+    port: "5672"
+    username: ""
+    password:
+      isSecret: false
+      hardcoded: ""
+      secretName: ""
+      secretKey: ""
+
+
+

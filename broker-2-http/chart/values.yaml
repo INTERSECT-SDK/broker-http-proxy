@@ -29,7 +29,7 @@ diagnosticMode:
 image:
   registry: code.ornl.gov:4567
   #registry: ghcr.io
-  repository: broker-http-proxy
+  repository: broker-2-http
   # TODO this tag should be something like "broker-2-http-0.1.0" or "http-2-broker-0.1.0"
   tag: "0.1.0"
   digest: ""
@@ -161,20 +161,14 @@ serviceAccount:
 ### application stuff
 
 app:
-  name: "http-2-broker"  # can also be "broker-2-http"
-  config:
-    logLevel: "info"
-    topic_prefix: "" # http-2-broker only, i.e. "organization.facility.system", you should consciously set this value
-    other_proxy_url: "" # broker-2-http only
-    broker:
-      host: "127.0.0.1"
-      port: "5672"
-      username: ""
-      password:
-        isSecret: false
-        hardcoded: ""
-        secretName: ""
-        secretKey: ""
-
-
-
+  logLevel: "info"
+  topic_prefix: "" # http-2-broker only, i.e. "organization.facility.system", you should consciously set this value
+  broker:
+    host: "127.0.0.1"
+    port: "5672"
+    username: ""
+    password:
+      isSecret: false
+      hardcoded: ""
+      secretName: ""
+      secretKey: ""
