@@ -2,6 +2,7 @@
 // see: https://github.com/tokio-rs/axum/blob/main/examples/sqlx-postgres/src/main.rs
 
 use axum::{routing::get, serve::Serve, Router};
+use secrecy::Secret;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
@@ -25,6 +26,10 @@ use intersect_ingress_proxy_common::signals::wait_for_os_signal;
 pub struct ApplicationState {
     /// this broadcaster gets messages published to it from one source and can publish many messages from it
     pub broadcaster: Arc<Broadcaster>,
+    /// basic auth username
+    pub username: String,
+    /// basic auth password
+    pub password: Secret<String>,
 }
 
 type AppServer = Serve<Router, Router>;
@@ -85,7 +90,11 @@ async fn run(
     let broadcaster = Broadcaster::new();
     // TODO this is a slightly awkward way to persist the AMQPManager
     let amqp_manager = AmqpManager::new(configuration, broadcaster.clone()).await;
-    let app_state = Arc::new(ApplicationState { broadcaster });
+    let app_state = Arc::new(ApplicationState {
+        broadcaster,
+        username: configuration.username.clone(),
+        password: configuration.password.clone(),
+    });
 
     let app = Router::new()
         .route("/healthcheck", get(health_check))

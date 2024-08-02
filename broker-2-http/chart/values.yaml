@@ -163,6 +163,8 @@ serviceAccount:
 app:
   logLevel: "info"
   topic_prefix: "" # http-2-broker only, i.e. "organization.facility.system", you should consciously set this value
+  username: ""
+  password: ""
   broker:
     host: "127.0.0.1"
     port: "5672"

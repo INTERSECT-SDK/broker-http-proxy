@@ -17,6 +17,7 @@ use intersect_ingress_proxy_common::signals::wait_for_os_signal;
 use intersect_ingress_proxy_common::telemetry::{
     get_json_subscriber, get_pretty_subscriber, init_subscriber,
 };
+use secrecy::ExposeSecret;
 
 /// Data we need to share across multiple closures.
 struct BrokerData {
@@ -67,7 +68,15 @@ async fn send_message(message: String, broker_data: Arc<BrokerData>) {
 
 /// Return value - exit code to use
 async fn event_source_loop(configuration: &Settings, broker_data: Arc<BrokerData>) -> i32 {
-    let mut es = EventSource::get(&configuration.other_proxy_url);
+    let mut es = EventSource::new(
+        reqwest::Client::new()
+            .get(&configuration.other_proxy.url)
+            .basic_auth(
+                &configuration.other_proxy.username,
+                Some(configuration.other_proxy.password.expose_secret()),
+            ),
+    )
+    .unwrap();
     let mut rc = 0;
     loop {
         tokio::select! {
@@ -83,7 +92,7 @@ async fn event_source_loop(configuration: &Settings, broker_data: Arc<BrokerData
                     Some(event) => {
                         match event {
                             Ok(Event::Open) => {
-                                tracing::info!("connected to {}", &configuration.other_proxy_url);
+                                tracing::info!("connected to {}", &configuration.other_proxy.url);
                             },
                             Ok(Event::Message(message)) => {
                                 send_message(message.data, broker_data.clone()).await;

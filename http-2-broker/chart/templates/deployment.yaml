@@ -107,8 +107,12 @@ spec:
               value: {{ .Values.app.config.broker.host | quote }}
             - name: PROXYAPP_BROKER__PORT
               value: {{ .Values.app.config.broker.port | quote }}
-            - name: PROXYAPP_OTHER_PROXY_URL
-              value: {{ .Values.app.config.other_proxy_url | quote }}
+            - name: PROXYAPP_OTHER_PROXY__URL
+              value: {{ .Values.app.config.other_proxy.url | quote }}
+            - name: PROXYAPP_OTHER_PROXY__USERNAME
+              value: {{ .Values.app.config.other_proxy.username | quote }}
+            - name: PROXYAPP_OTHER_PROXY__PASSWORD
+              value: {{ .Values.app.config.other_proxy.password | quote }}
           envFrom:
             {{- if .Values.extraEnvVarsCM }}
             - configMapRef:

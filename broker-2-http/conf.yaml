@@ -9,4 +9,6 @@ broker:
 # use amqp topic notation
 topic_prefix: "organization.facility.system"  # CHANGE THIS PER DEPLOYMENT!!!
 log_level: "debug"
+username: dummy_username
+password: dummy_password
 production: false

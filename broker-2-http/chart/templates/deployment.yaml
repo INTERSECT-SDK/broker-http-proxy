@@ -114,6 +114,10 @@ spec:
               value: {{ .Values.containerPort | quote }}
             - name: PROXYAPP_TOPIC_PREFIX
               value: {{ required "app.config.topic_prefix not set (i.e. 'organization.facility.system')" .Values.app.config.topic_prefix | quote }}
+            - name: PROXYAPP_APP_USERNAME
+              value: {{ .Values.app.username | quote }}
+            - name: PROXYAPP_APP_PASSWORD
+              value: {{ .Values.app.password | quote }}                            
           envFrom:
             {{- if .Values.extraEnvVarsCM }}
             - configMapRef:

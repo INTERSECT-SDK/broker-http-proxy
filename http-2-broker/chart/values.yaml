@@ -130,7 +130,10 @@ serviceAccount:
 
 app:
   logLevel: "info"
-  other_proxy_url: "" # broker-2-http only
+  other_proxy:
+    url: "" # this should be the complete URL
+    username: ""
+    password: ""
   broker:
     host: "127.0.0.1"
     port: "5672"
