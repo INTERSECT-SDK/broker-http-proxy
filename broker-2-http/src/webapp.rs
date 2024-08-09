@@ -14,7 +14,6 @@ use tower_http::{
 use tracing::Level;
 
 use crate::{
-    amqp_manager::AmqpManager,
     broadcaster::Broadcaster,
     configuration::Settings,
     routes::{health_check::health_check, not_found::handler_404, subscribe::sse_handler},
@@ -23,7 +22,7 @@ use crate::{
 use intersect_ingress_proxy_common::signals::wait_for_os_signal;
 
 /// This is state that can be accessed by any endpoint on the server.
-pub struct ApplicationState {
+pub struct WebApplicationState {
     /// this broadcaster gets messages published to it from one source and can publish many messages from it
     pub broadcaster: Arc<Broadcaster>,
     /// basic auth username
@@ -32,14 +31,17 @@ pub struct ApplicationState {
     pub password: Secret<String>,
 }
 
-type AppServer = Serve<Router, Router>;
-pub struct Application {
+type WebAppServer = Serve<Router, Router>;
+pub struct WebApplication {
     pub port: u16,
-    pub server: AppServer,
+    pub server: WebAppServer,
 }
 
-impl Application {
-    pub async fn build(configuration: Settings) -> Result<(Self, AmqpManager), anyhow::Error> {
+impl WebApplication {
+    pub async fn build(
+        configuration: &Settings,
+        broadcaster: Arc<Broadcaster>,
+    ) -> Result<Self, anyhow::Error> {
         let address = format!(
             "{}:{}",
             if configuration.production {
@@ -51,11 +53,11 @@ impl Application {
         );
         let listener = TcpListener::bind(address).await?;
         let port = listener.local_addr().unwrap().port();
-        let (server, amqp_manager) = run(listener, &configuration).await?;
+        let server = run(listener, configuration, broadcaster).await?;
 
         tracing::info!("Web server is running on port {}", port);
 
-        Ok((Self { port, server }, amqp_manager))
+        Ok(Self { port, server })
     }
 
     pub fn port(&self) -> u16 {
@@ -73,7 +75,8 @@ impl Application {
 async fn run(
     listener: TcpListener,
     configuration: &Settings,
-) -> Result<(AppServer, AmqpManager), anyhow::Error> {
+    broadcaster: Arc<Broadcaster>,
+) -> Result<WebAppServer, anyhow::Error> {
     let middleware = ServiceBuilder::new()
         .set_x_request_id(MakeRequestUuid)
         .layer(
@@ -87,10 +90,7 @@ async fn run(
         )
         .propagate_x_request_id();
 
-    let broadcaster = Broadcaster::new();
-    // TODO this is a slightly awkward way to persist the AMQPManager
-    let amqp_manager = AmqpManager::new(configuration, broadcaster.clone()).await;
-    let app_state = Arc::new(ApplicationState {
+    let app_state = Arc::new(WebApplicationState {
         broadcaster,
         username: configuration.username.clone(),
         password: configuration.password.clone(),
@@ -98,11 +98,12 @@ async fn run(
 
     let app = Router::new()
         .route("/healthcheck", get(health_check))
-        .route("/", get(sse_handler))
+        .route("/subscribe", get(sse_handler))
+        //.route("/publish", post(publish))
         .layer(middleware)
         .with_state(app_state)
         .fallback(handler_404);
 
     let server = axum::serve(listener, app);
-    Ok((server, amqp_manager))
+    Ok(server)
 }

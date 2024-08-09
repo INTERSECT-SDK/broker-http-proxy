@@ -1,4 +1,7 @@
-use broker_2_http::{configuration::Settings, startup::Application};
+use broker_2_http::{
+    amqp_consumer::broker_consumer_loop, broadcaster::Broadcaster, configuration::Settings,
+    webapp::WebApplication,
+};
 
 use intersect_ingress_proxy_common::configuration::get_configuration;
 use intersect_ingress_proxy_common::telemetry::{
@@ -22,9 +25,19 @@ async fn main() -> anyhow::Result<()> {
         init_subscriber(subscriber);
     }
 
-    let (application, amqp_manager) = Application::build(configuration).await?;
+    let broadcaster = Broadcaster::new();
+
+    let application = WebApplication::build(&configuration, broadcaster.clone()).await?;
+
+    let broker_join_handle = broker_consumer_loop(
+        configuration.broker.clone(),
+        configuration.topic_prefix.clone(),
+        broadcaster.clone(),
+    )
+    .await;
     application.run_until_stopped().await?;
     tracing::warn!("Application shutting down, please wait for cleanups...");
-    amqp_manager.destruct().await;
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    broker_join_handle.abort();
     Ok(())
 }

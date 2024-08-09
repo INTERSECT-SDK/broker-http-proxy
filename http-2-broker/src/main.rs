@@ -4,6 +4,7 @@ use std::time::Duration;
 use amqprs::{channel::BasicPublishArguments, connection::Connection, BasicProperties};
 use futures::StreamExt;
 use reqwest_eventsource::{Event, EventSource};
+use tokio::sync::Mutex;
 
 use http_2_broker::configuration::Settings;
 use intersect_ingress_proxy_common::configuration::get_configuration;
@@ -21,10 +22,10 @@ use secrecy::ExposeSecret;
 
 /// Data we need to share across multiple closures.
 struct BrokerData {
-    pub connection: Connection,
+    pub connection: Mutex<Connection>,
 }
 
-async fn send_message(message: String, broker_data: Arc<BrokerData>) {
+async fn send_message(configuration: &Settings, message: String, broker_data: Arc<BrokerData>) {
     let es_data_result = extract_eventsource_data(&message);
     if es_data_result.is_err() {
         return;
@@ -38,10 +39,15 @@ async fn send_message(message: String, broker_data: Arc<BrokerData>) {
         return;
     }
 
+    let mut connection = broker_data.connection.lock().await;
+    if !connection.is_open() {
+        *connection = get_connection(&configuration.broker, 0).await;
+    }
+
     // TODO - we'd ideally like to potentially reuse the channel instead of closing it every time
     // see https://github.com/rdoetjes/rabbit_systeminfo/blob/master/systeminfo/src/main.rs#L84 as an example
     // we NEED to explicitly close the channel, or else problems on the broker may develop
-    let channel = get_channel(&broker_data.connection).await;
+    let channel = get_channel(&connection).await;
 
     let args = BasicPublishArguments::new(INTERSECT_MESSAGE_EXCHANGE, &topic);
     // NOTE: the publish() function takes ownership of the string, if you don't care about logging then don't clone
@@ -95,7 +101,7 @@ async fn event_source_loop(configuration: &Settings, broker_data: Arc<BrokerData
                                 tracing::info!("connected to {}", &configuration.other_proxy.url);
                             },
                             Ok(Event::Message(message)) => {
-                                send_message(message.data, broker_data.clone()).await;
+                                send_message(configuration, message.data, broker_data.clone()).await;
                             },
                             Err(err) => {
                                 // will happen if we can't connect to the endpoint OR if the endpoint drops us
@@ -155,7 +161,9 @@ pub async fn main() {
         }
     }
 
-    let broker_data = Arc::new(BrokerData { connection });
+    let broker_data = Arc::new(BrokerData {
+        connection: Mutex::new(connection),
+    });
 
     let rc = event_source_loop(&configuration, broker_data.clone()).await;
 

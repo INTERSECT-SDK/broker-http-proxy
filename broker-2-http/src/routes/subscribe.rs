@@ -11,11 +11,11 @@ use secrecy::ExposeSecret;
 use std::convert::Infallible;
 use std::sync::Arc;
 
-use crate::startup::ApplicationState;
+use crate::webapp::WebApplicationState;
 use intersect_ingress_proxy_common::signals::wait_for_os_signal;
 
 fn sse_response(
-    app_state: Arc<ApplicationState>,
+    app_state: Arc<WebApplicationState>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let mut rx = app_state.broadcaster.add_client();
 
@@ -48,7 +48,7 @@ fn sse_response(
 /// https://github.com/tokio-rs/axum/discussions/1670
 /// https://github.com/tokio-rs/axum/discussions/2264
 pub async fn sse_handler(
-    State(app_state): State<Arc<ApplicationState>>,
+    State(app_state): State<Arc<WebApplicationState>>,
     TypedHeader(authorization): TypedHeader<Authorization<Basic>>,
 ) -> impl IntoResponse {
     if authorization.username() != app_state.username

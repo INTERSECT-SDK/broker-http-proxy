@@ -55,7 +55,7 @@ These instructions assume you are using the docker compose configuration and the
 
 (This closely replicates what an INTERSECT message looks like, though the only thing you really need to check is that your conf.yaml's `topic_prefix` value starts with the value for `headers.source`)
 
-7) Click "publish_message"
+7) Click "publish_message". At this point the message should show up in the logs for both `http-2-broker` and `broker-2-http` .
 8) On localhost:15673 `Queues and streams` section, blow up `Get messages`, set Ack mode to `Automatic ack`, click on `Get messages`, you should see your payload from step 6.
 
 Congratulations, you have successfully simulated a publisher and a subscriber being able to talk to each other across 2 separate message brokers. 
