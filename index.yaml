@@ -13,4 +13,17 @@ entries:
     urls:
     - https://github.com/INTERSECT-SDK/broker-http-proxy/releases/download/broker-2-http-0.1.0/broker-2-http-0.1.0.tgz
     version: 0.1.0
-generated: "2024-08-11T18:09:47.675619041Z"
+  http-2-broker:
+  - apiVersion: v2
+    created: "2024-08-11T18:24:48.135177018Z"
+    dependencies:
+    - name: common
+      repository: oci://registry-1.docker.io/bitnamicharts
+      version: ^2.9.1
+    description: Subscribe to events over HTTP and publish them on a local broker
+    digest: 820046139a8dc7935c8f22933fb361704a2f6c7b283e4e6706ea44624e67e17f
+    name: http-2-broker
+    urls:
+    - https://github.com/INTERSECT-SDK/broker-http-proxy/releases/download/http-2-broker-0.1.0/http-2-broker-0.1.0.tgz
+    version: 0.1.0
+generated: "2024-08-11T18:24:48.135186035Z"
