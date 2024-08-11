@@ -5,8 +5,8 @@ on:
     branches:
       - "main"
     paths:
-      - "broker-2-http/charts/**"
-      - "http-2-broker/charts/**"
+      - "broker-2-http/chart/**"
+      - "http-2-broker/chart/**"
   workflow_dispatch:
 
 jobs:

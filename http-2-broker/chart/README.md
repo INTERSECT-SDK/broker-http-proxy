@@ -2,8 +2,6 @@
 
 Most templates are based off of the [Bitnami Charts Template](https://github.com/bitnami/charts/tree/main/template/])
 
-Neo4J chart is stored at https://code.ornl.gov/rse/charts/neo4j/ , a fork of the official Neo4J chart.
-
 We also use the Bitnami Common library to try and standardize some boilerplate across all charts.
 
 ## Linting
