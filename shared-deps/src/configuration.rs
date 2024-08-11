@@ -1,4 +1,6 @@
 /// FOR DEVOPS USERS:
+/// This file represents common configuration structures used across both applications.
+/// Implementation details are in the "get_configuration" function.
 use std::{fmt::Display, str::FromStr};
 
 use secrecy::Secret;

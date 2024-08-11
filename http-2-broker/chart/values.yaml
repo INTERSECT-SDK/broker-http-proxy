@@ -27,11 +27,9 @@ diagnosticMode:
 ### Container params ###
 
 image:
-  registry: code.ornl.gov:4567
-  #registry: ghcr.io
-  repository: http-2-broker
-  # TODO this tag should be something like "broker-2-http-0.1.0" or "http-2-broker-0.1.0"
-  tag: "0.1.0"
+  registry: ghcr.io
+  repository: INTERSECT-SDK/broker-http-proxy/http-2-broker
+  tag: "latest"
   digest: ""
   pullPolicy: ""
   pullSecrets: []
@@ -132,8 +130,8 @@ app:
   logLevel: "info"
   other_proxy:
     url: "" # this should be the complete URL
-    username: ""
-    password: ""
+    username: "" # needed credential for clients calling HTTP endpoints other than /healthcheck
+    password: "" # needed credential for clients calling HTTP endpoints other than /healthcheck
   broker:
     host: "127.0.0.1"
     port: "5672"

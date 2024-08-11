@@ -94,26 +94,26 @@ spec:
             - name: PROXYAPP_PRODUCTION
               value: "true"
             - name: PROXYAPP_LOG_LEVEL
-              value: {{ .Values.app.config.log_level | quote }}
+              value: {{ .Values.app.log_level | quote }}
             - name: PROXYAPP_BROKER__USERNAME
-              value: {{ .Values.app.config.broker.username | quote }}
+              value: {{ .Values.app.broker.username | quote }}
             - name: PROXYAPP_BROKER__PASSWORD
-              {{- if .Values.app.config.broker.password.isSecret }}
+              {{- if .Values.app.broker.password.isSecret }}
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.app.config.broker.password.secretName }}
-                  key: {{ .Values.app.config.broker.password.secretKey }}
+                  name: {{ .Values.app.broker.password.secretName }}
+                  key: {{ .Values.app.broker.password.secretKey }}
               {{- else }}
-              value: {{ .Values.app.config.broker.password.hardcoded | quote }}
+              value: {{ .Values.app.broker.password.hardcoded | quote }}
               {{- end }}
             - name: PROXYAPP_BROKER__HOST
-              value: {{ .Values.app.config.broker.host | quote }}
+              value: {{ .Values.app.broker.host | quote }}
             - name: PROXYAPP_BROKER__PORT
-              value: {{ .Values.app.config.broker.port | quote }}
+              value: {{ .Values.app.broker.port | quote }}
             - name: PROXYAPP_APP_PORT
               value: {{ .Values.containerPort | quote }}
             - name: PROXYAPP_TOPIC_PREFIX
-              value: {{ required "app.config.topic_prefix not set (i.e. 'organization.facility.system')" .Values.app.config.topic_prefix | quote }}
+              value: {{ required "app.config.topic_prefix not set (i.e. 'organization.facility.system')" .Values.app.topic_prefix | quote }}
             - name: PROXYAPP_APP_USERNAME
               value: {{ .Values.app.username | quote }}
             - name: PROXYAPP_APP_PASSWORD
