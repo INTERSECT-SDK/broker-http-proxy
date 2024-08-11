@@ -28,7 +28,7 @@ diagnosticMode:
 
 image:
   registry: ghcr.io
-  repository: INTERSECT-SDK/broker-http-proxy/broker-2-http
+  repository: intersect-sdk/broker-http-proxy/broker-2-http
   tag: "latest"
   digest: ""
   pullPolicy: ""

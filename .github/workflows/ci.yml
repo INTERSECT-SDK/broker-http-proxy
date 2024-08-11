@@ -78,6 +78,6 @@ jobs:
           context: .
           build-args: ${{ matrix.build_args }}
           tags: |
-            ghcr.io/INTERSECT-SDK/broker-http-proxy/${{ matrix.app_name }}:latest
-            ghcr.io/INTERSECT-SDK/broker-http-proxy/${{ matrix.app_name }}:${{ github.sha }}
+            ghcr.io/intersect-sdk/broker-http-proxy/${{ matrix.app_name }}:latest
+            ghcr.io/intersect-sdk/broker-http-proxy/${{ matrix.app_name }}:${{ github.sha }}
           push: true

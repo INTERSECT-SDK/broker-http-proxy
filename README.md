@@ -1,6 +1,8 @@
-# intersect-ingress-proxy
+# broker-http-proxy
 
 Effectively serves as a way for two message brokers to "share" messages across HTTPS. These applications connect to each other through server-sent events, allowing for messages to be pushed without waiting for a response.
+
+Specific INTERSECT messaging logic has its own module (see `shared-deps/src/intersect_messaging.rs`), so these applications could easily be forked to support another ecosystem with its own messaging protocol.
 
 This repository consists of two applications, neither of which can function without the other:
 
