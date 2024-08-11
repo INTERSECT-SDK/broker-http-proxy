@@ -5,8 +5,7 @@ on:
     branches:
       - "main"
     paths:
-      - "broker-2-http/chart/**"
-      - "http-2-broker/chart/**"
+      - "charts/**"
   workflow_dispatch:
 
 jobs:
@@ -14,13 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    strategy:
-      matrix:
-        include:
-          - chart_dir: broker-2-http/chart/
-            app_name: broker-2-http
-          - chart_dir: http-2-broker/chart/
-            app_name: http-2-broker
 
     steps:
       - uses: actions/checkout@v4
@@ -41,9 +33,9 @@ jobs:
         run: |
           helm repo add bitnami https://charts.bitnami.com/bitnami
 
-      - name: Run chart-releaser for ${{ matrix.app_name }}
+      - name: Run chart-releaser for all applications
         uses: helm/chart-releaser-action@v1.6.0
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
         with:
-          charts_dir: ${{ matrix.chart_dir }}
+          charts_dir: charts
