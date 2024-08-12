@@ -20,30 +20,31 @@ Access the pod you want to debug by executing
 
 In order to replicate the container startup scripts execute this command:
 
-    /docker-entrypoint.sh uvicorn --host=0.0.0.0 --port=8001 src.main:app
+  /app/bin
 
 {{- else }}
+
+{{- $port := .Values.service.port | toString }}
+Get the base URL by running these commands:
 
 {{- if contains "LoadBalancer" .Values.service.type }}
 
   NOTE: It may take a few minutes for the LoadBalancer IP to be available.
         Watch the status with: 'kubectl get svc --namespace {{ .Release.Namespace }} -w {{ include "common.names.fullname" . }}'
 
-    export SERVICE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].port}" services {{ include "common.names.fullname" . }})
-    export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "common.names.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-    echo "http://${SERVICE_IP}:${SERVICE_PORT}"
+   export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "common.names.fullname" . }} --template "{{ "{{ range (index .status.loadBalancer.ingress 0) }}{{ . }}{{ end }}" }}")
+   echo "Healthcheck URL: http://$SERVICE_IP{{- if ne $port "80" }}:{{ .Values.service.port }}{{ end }}/healthcheck"
 
 {{- else if contains "ClusterIP"  .Values.service.type }}
 
-    export SERVICE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].port}" services {{ include "common.names.fullname" . }})
-    kubectl port-forward --namespace {{ .Release.Namespace }} svc/{{ include "common.names.fullname" . }} ${SERVICE_PORT}:${SERVICE_PORT} &
-    echo "http://127.0.0.1:${SERVICE_PORT}"
+    kubectl port-forward --namespace {{ .Release.Namespace }} svc/{{ include "common.names.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }} &
+    echo "Healthcheck URL: http://127.0.0.1{{- if ne $port "80" }}:{{ .Values.service.port }}{{ end }}/healthcheck"
 
 {{- else if contains "NodePort" .Values.service.type }}
 
     export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "common.names.fullname" . }})
     export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
-    echo "http://${NODE_IP}:${NODE_PORT}"
+    echo "Healthcheck URL: http://${NODE_IP}:${NODE_PORT}/healthcheck"
 
 {{- end }}
 {{- end }}

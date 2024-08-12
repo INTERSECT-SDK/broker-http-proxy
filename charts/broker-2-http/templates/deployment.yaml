@@ -113,7 +113,7 @@ spec:
             - name: PROXYAPP_APP_PORT
               value: {{ .Values.containerPort | quote }}
             - name: PROXYAPP_TOPIC_PREFIX
-              value: {{ required "app.config.topic_prefix not set (i.e. 'organization.facility.system')" .Values.app.topic_prefix | quote }}
+              value: {{ required "app.topic_prefix not set (i.e. 'organization.facility.system')" .Values.app.topic_prefix | quote }}
             - name: PROXYAPP_APP_USERNAME
               value: {{ .Values.app.username | quote }}
             - name: PROXYAPP_APP_PASSWORD
