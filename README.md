@@ -19,7 +19,7 @@ Currently only supports AMQP 0-9-1 as the broker protocol but can potentially su
 
 The best way to install Rust is through [Rustup](https://www.rust-lang.org/tools/install).
 
-You can format with `cargo fmt` and lint with `cargo clippy`
+You can format with `cargo fmt` and lint with `cargo clippy` . There's also a pre-commit hook you can use ([installation instructions](https://pre-commit.com/#installation))
 
 ## Application startup
 
@@ -60,7 +60,7 @@ These instructions assume you are using the docker compose configuration and the
 7) Click "publish_message". At this point the message should show up in the logs for both `http-2-broker` and `broker-2-http` .
 8) On localhost:15673 `Queues and streams` section, blow up `Get messages`, set Ack mode to `Automatic ack`, click on `Get messages`, you should see your payload from step 6.
 
-Congratulations, you have successfully simulated a publisher and a subscriber being able to talk to each other across 2 separate message brokers. 
+Congratulations, you have successfully simulated a publisher and a subscriber being able to talk to each other across 2 separate message brokers.
 
 ### Testing with INTERSECT-SDK directly
 
@@ -78,4 +78,4 @@ Now it's advisable to [run some INTERSECT-SDK examples](https://github.com/INTER
 
 - one exchange for all messages (see `intersect_messaging.rs` to get name)
 - routing keys will match SDK naming schematics (SOS hierarchy, "." as separator, end with ".{userspace|lifecycle|events}")
-- queue name will also match SDK naming schematics (might need to be careful here, there's a 128 character limit here). This can really be whatever but we need to construct the queue name as something idempotent, we don't really want to have a billion durable queues floating around. 
+- queue name will also match SDK naming schematics (might need to be careful here, there's a 128 character limit here). This can really be whatever but we need to construct the queue name as something idempotent, we don't really want to have a billion durable queues floating around.
