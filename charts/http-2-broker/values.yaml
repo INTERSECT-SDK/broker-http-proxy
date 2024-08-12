@@ -127,7 +127,7 @@ serviceAccount:
 ### application stuff
 
 app:
-  logLevel: "info"
+  log_level: "info"
   other_proxy:
     url: "" # this should be the complete URL
     username: "" # needed credential for clients calling HTTP endpoints other than /healthcheck

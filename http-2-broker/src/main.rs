@@ -157,6 +157,7 @@ pub async fn main() {
         if exchange_result.is_err() {
             let err = exchange_result.unwrap_err();
             tracing::error!("could not create exchange: {}", err);
+            connection.close().await.expect("Could not close connection after failed exchange creation");
             std::process::exit(1);
         }
     }
