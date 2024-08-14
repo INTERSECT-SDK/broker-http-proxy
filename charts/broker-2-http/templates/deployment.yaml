@@ -110,7 +110,7 @@ spec:
               value: {{ .Values.app.broker.host | quote }}
             - name: PROXYAPP_BROKER__PORT
               value: {{ .Values.app.broker.port | quote }}
-            - name: PROXYAPP_PORT
+            - name: PROXYAPP_APP_PORT
               value: {{ .Values.containerPort | quote }}
             - name: PROXYAPP_TOPIC_PREFIX
               value: {{ required "app.topic_prefix not set (i.e. 'organization.facility.system')" .Values.app.topic_prefix | quote }}
