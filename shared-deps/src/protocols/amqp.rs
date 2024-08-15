@@ -35,7 +35,7 @@ pub async fn get_connection(connection_details: &BrokerSettings, retries: u32) -
             }
         }
         tracing::error!("trying to connect after error");
-        std::thread::sleep(Duration::from_millis(2000));
+        tokio::time::sleep(Duration::from_millis(2000)).await;
         res = Connection::open(&OpenConnectionArguments::new(
             &connection_details.host,
             connection_details.port,

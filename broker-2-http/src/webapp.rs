@@ -1,6 +1,3 @@
-//! src/startup.rs
-// see: https://github.com/tokio-rs/axum/blob/main/examples/sqlx-postgres/src/main.rs
-
 use axum::{routing::get, serve::Serve, Router};
 use secrecy::Secret;
 use std::sync::Arc;
@@ -97,11 +94,11 @@ async fn run(
     });
 
     let app = Router::new()
-        .route("/healthcheck", get(health_check))
         .route("/subscribe", get(sse_handler))
         //.route("/publish", post(publish))
-        .layer(middleware)
+        .layer(middleware) // routes added before this layer will be logged, after this layer will not be logged
         .with_state(app_state)
+        .route("/healthcheck", get(health_check))
         .fallback(handler_404);
 
     let server = axum::serve(listener, app);
