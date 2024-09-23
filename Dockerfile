@@ -27,7 +27,7 @@ RUN cargo build --release --bin ${BIN_NAME}
 FROM debian:stable-slim AS runtime
 ARG BIN_NAME
 WORKDIR /app
-RUN apt update -y && apt upgrade -y && apt install -y --no-install-recommends pkg-config libssl-dev
+RUN apt update -y && apt upgrade -y && apt install -y --no-install-recommends pkg-config libssl-dev ca-certificates
 COPY --from=builder /app/target/release/${BIN_NAME} /app/bin
 ENV PROXYAPP_PRODUCTION="true"
 ENTRYPOINT ["/app/bin"]
