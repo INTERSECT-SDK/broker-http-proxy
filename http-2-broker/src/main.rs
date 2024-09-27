@@ -38,6 +38,7 @@ async fn send_message(configuration: &Settings, message: String, broker_data: Ar
         );
         return;
     }
+    tracing::debug!("Publishing message with topic: {}", &topic);
 
     let mut connection = broker_data.connection.lock().await;
     if !connection.is_open() {
