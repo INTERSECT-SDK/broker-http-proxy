@@ -27,6 +27,7 @@ fn sse_response(
                     break;
                 },
                 // send the broadcast message to the client, and continue listening for more messages
+                // TODO figure out more robust mechanism to handle "lagged" errors from the receiver.
                 resp = rx.recv() => {
                     match resp {
                         Ok(event) => {

@@ -17,8 +17,8 @@ impl Broadcaster {
     /// Create the broadcaster. Note that it automatically wraps it in an Arc.
     /// The broadcaster manages its producer but does not manage its consumers
     pub fn new() -> Arc<Self> {
-        // TODO may be able to get away with smaller capacity
-        let (tx, _) = broadcast::channel(1);
+        // use a fairly large channel capacity to account for potential receiver lags
+        let (tx, _) = broadcast::channel(256);
         Arc::new(Broadcaster { fanout: tx })
     }
 
