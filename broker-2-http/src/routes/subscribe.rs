@@ -34,7 +34,14 @@ fn sse_response(
                             yield Ok(event);
                         },
                         Err(e) => {
-                            tracing::error!(error = ?e, "SSE somehow didn't get message from broadcaster");
+                            match e {
+                                tokio::sync::broadcast::error::RecvError::Closed => {
+                                    tracing::error!(error = ?e, "Broadcasting pipeline to SSE somehow closed, should not see this message!")
+                                },
+                                tokio::sync::broadcast::error::RecvError::Lagged(lag_count) => {
+                                    tracing::error!(error = ?e, "SSE has missed {} messages from broadcaster", lag_count)
+                                },
+                            };
                         },
                     }
                 },
