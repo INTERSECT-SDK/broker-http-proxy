@@ -87,3 +87,8 @@ pub fn is_name_compliant(name: &str) -> bool {
             .chars()
             .any(|c| !c.is_alphanumeric() && c != '-' && c != '_' && c != '.' && c != ':')
 }
+
+/// make sure that the routing key is valid for AMQP
+pub fn is_routing_key_compliant(key: &str) -> bool {
+    key.len() < 256
+}

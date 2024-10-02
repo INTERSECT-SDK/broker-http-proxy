@@ -12,7 +12,7 @@ use intersect_ingress_proxy_common::intersect_messaging::{
     extract_eventsource_data, INTERSECT_MESSAGE_EXCHANGE,
 };
 use intersect_ingress_proxy_common::protocols::amqp::{
-    get_channel, get_connection, is_name_compliant, make_exchange,
+    get_channel, get_connection, is_routing_key_compliant, make_exchange,
 };
 use intersect_ingress_proxy_common::signals::wait_for_os_signal;
 use intersect_ingress_proxy_common::telemetry::{
@@ -31,7 +31,7 @@ async fn send_message(configuration: &Settings, message: String, broker_data: Ar
         return;
     }
     let (topic, data) = es_data_result.unwrap();
-    if !is_name_compliant(&topic) {
+    if !is_routing_key_compliant(&topic) {
         tracing::warn!(
             "{} is not a valid AMQP topic name, will not attempt publish",
             topic
