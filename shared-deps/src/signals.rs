@@ -1,4 +1,4 @@
-/// full credit to this module goes to https://github.com/Finomnis/tokio-graceful-shutdown/blob/43684d80cc5afbe49c87fbc3f8404dce0fc01144/src/signal_handling.rs
+// full credit to this module goes to https://github.com/Finomnis/tokio-graceful-shutdown/blob/43684d80cc5afbe49c87fbc3f8404dce0fc01144/src/signal_handling.rs
 
 /// Waits for a signal that requests a graceful shutdown, like SIGTERM or SIGINT.
 #[cfg(unix)]

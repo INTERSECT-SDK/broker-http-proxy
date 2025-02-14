@@ -1,79 +1,95 @@
-use amqprs::{
-    channel::{
-        BasicAckArguments, BasicCancelArguments, BasicConsumeArguments, Channel, ConsumerMessage,
-        QueueBindArguments, QueueDeclareArguments,
-    },
-    connection::Connection,
+use amqprs::channel::{
+    BasicAckArguments, BasicCancelArguments, BasicConsumeArguments, BasicRejectArguments, Channel,
+    ConsumerMessage,
 };
+use deadpool_amqprs::Pool;
 use std::sync::Arc;
+use tokio::sync::Barrier;
 use uuid::Uuid;
 
 use crate::broadcaster::Broadcaster;
-use intersect_ingress_proxy_common::intersect_messaging::INTERSECT_MESSAGE_EXCHANGE;
-use intersect_ingress_proxy_common::protocols::amqp::{get_channel, get_connection, make_exchange};
+use intersect_ingress_proxy_common::protocols::amqp::{
+    get_channel, verify_connection_pool, APPLICATION_QUEUE_NAME,
+};
 use intersect_ingress_proxy_common::{
-    configuration::BrokerSettings,
     intersect_messaging::{make_eventsource_data, should_message_passthrough},
     signals::wait_for_os_signal,
 };
 
 pub async fn broker_consumer_loop(
-    config_broker: BrokerSettings,
+    amqp_connection_pool: Pool,
     config_topic: String,
     broadcaster: Arc<Broadcaster>,
+    barrier: Arc<Barrier>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
-        broker_consumer_loop_inner(config_broker, config_topic, broadcaster).await
+        broker_consumer_loop_inner(amqp_connection_pool, config_topic, broadcaster, barrier).await
     })
 }
 
 async fn broker_consumer_loop_inner(
-    config_broker: BrokerSettings,
+    amqp_connection_pool: Pool,
     config_topic: String,
     broadcaster: Arc<Broadcaster>,
+    barrier: Arc<Barrier>,
 ) {
-    let mut connected_once = false;
-
+    let mut needs_reverification = false;
     'connection_loop: loop {
-        let connection = get_connection(&config_broker, if connected_once { 0 } else { 10 }).await;
-        let channel = get_channel(&connection).await;
-        connected_once = true;
+        let connection = amqp_connection_pool.get().await;
+        if connection.is_err() {
+            needs_reverification = true;
+            tracing::warn!("Consumer lost connection to broker, retrying in 5 seconds");
+            let future = tokio::time::sleep(std::time::Duration::from_secs(5));
+            tokio::pin!(future);
+            tokio::select! {
+                _ = wait_for_os_signal() => {
+                    break;
+                },
+                _ = &mut future => {
+                    continue;
+                },
+            }
+        }
 
-        make_exchange(&channel)
-            .await
-            .expect("Could not declare exchange on channel");
+        if needs_reverification {
+            if let Err(e) = verify_connection_pool(&amqp_connection_pool).await {
+                tracing::warn!(error = ?e, "Couldn't fully recover broker setup");
+                continue;
+            }
+        }
+        needs_reverification = true;
 
-        // we'll use a persistent queue named "broker-2-http", as there should only be one broker-2-http deployment per System
-        // TODO - note that we should probably name queues larger than 127 characters with a hashed key
-        let (queue_name, _, _) = channel
-            .queue_declare(QueueDeclareArguments::durable_client_named("broker-2-http"))
-            .await
-            .expect("Couldn't declare queue")
-            .expect("didn't get correct args back from queue declaration");
-
-        // listen for every single message on the exchange, we must do this due to the way userspace messages work
-        channel
-            .queue_bind(QueueBindArguments::new(
-                &queue_name,
-                INTERSECT_MESSAGE_EXCHANGE,
-                "#",
-            ))
-            .await
-            .expect("Couldn't bind to queue");
+        let channel_result = get_channel(&connection.unwrap()).await;
+        if let Err(e) = channel_result {
+            tracing::warn!(error = ?e, "Couldn't get channel, trying again?");
+            continue;
+        }
+        let channel = channel_result.unwrap();
 
         // Do NOT automatically acknowledge messages, we may not be able to forward them.
-        let args = BasicConsumeArguments::new(&queue_name, &Uuid::new_v4().to_string())
+        let args = BasicConsumeArguments::new(APPLICATION_QUEUE_NAME, &Uuid::new_v4().to_string())
             .manual_ack(true) // only ack messages we should actually publish, we will nack the others
             .finish();
 
-        let (consumer_tag, mut messages_rx) = channel.basic_consume_rx(args).await.unwrap();
+        let consume_result = channel.basic_consume_rx(args).await;
+        if consume_result.is_err() {
+            tracing::warn!("Couldn't start consuming, trying again?");
+            match channel.close().await {
+                Ok(_) => tracing::debug!("closed channel"),
+                Err(e) => {
+                    tracing::error!(error = ?e, "Could not close channel")
+                }
+            }
+            continue;
+        }
+        let (consumer_tag, mut messages_rx) = consume_result.unwrap();
         loop {
             tokio::select! {
                 // OS kill signal
                 _ = wait_for_os_signal() => {
                     // attempt cleanup before terminating
                     tracing::warn!("Received terminate signal from OS, attempting to gracefully disconnect from AMQP broker...");
-                    cleanup(consumer_tag, channel, connection).await;
+                    cleanup(consumer_tag, channel).await;
 
                     break 'connection_loop;
                 },
@@ -90,8 +106,9 @@ async fn broker_consumer_loop_inner(
         }
 
         // if we reach this, the channel has been closed from the messages_rx object (most likely from a broker disconnect), so we will clean up and then attempt reconnection
-        cleanup(consumer_tag, channel, connection).await;
+        cleanup(consumer_tag, channel).await;
     }
+    barrier.wait().await;
 }
 
 /// domain logic for handling a message from the broker
@@ -152,18 +169,18 @@ async fn consume_message(
             deliver,
         );
         // TODO - if we're able to determine SPECIFIC clients who did/did not get it, we may want to explicitly reject the message.
-        // match channel
-        //     .basic_reject(BasicRejectArguments::new(deliver.delivery_tag(), true))
-        //     .await
-        // {
-        //     Ok(_) => {}
-        //     Err(e) => tracing::error!(error = ?e, "manual nack did not work"),
-        // };
+        match channel
+            .basic_reject(BasicRejectArguments::new(deliver.delivery_tag(), true))
+            .await
+        {
+            Ok(_) => {}
+            Err(e) => tracing::error!(error = ?e, "manual nack did not work"),
+        };
     }
 }
 
 /// call this if we were instructed to shut down or our channel suddenly disconnected.
-async fn cleanup(consumer_tag: String, channel: Channel, connection: Connection) {
+async fn cleanup(consumer_tag: String, channel: Channel) {
     if let Err(e) = channel
         .basic_cancel(BasicCancelArguments::new(&consumer_tag))
         .await
@@ -174,12 +191,6 @@ async fn cleanup(consumer_tag: String, channel: Channel, connection: Connection)
         Ok(_) => tracing::debug!("closed channel"),
         Err(e) => {
             tracing::error!(error = ?e, "Could not close channel")
-        }
-    }
-    match connection.close().await {
-        Ok(_) => tracing::debug!("closeed connection"),
-        Err(e) => {
-            tracing::error!(error = ?e, "Could not close connection")
         }
     }
 }

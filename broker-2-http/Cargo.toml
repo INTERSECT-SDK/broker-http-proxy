@@ -17,6 +17,7 @@ anyhow = { workspace = true }
 async-stream = { workspace = true }
 amqprs = { workspace = true }
 config = { workspace = true }
+deadpool-amqprs = { workspace = true }
 futures = { workspace = true }
 secrecy = { workspace = true }
 serde = { workspace = true }
@@ -26,6 +27,7 @@ tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
 intersect-ingress-proxy-common = { path = "../shared-deps", version = "0.1.0" }
 axum = { version = "0.7.5", features = ["macros"] }
 axum-extra = { version = "0.9.3", features = ["typed-header"] }
@@ -33,6 +35,3 @@ headers = "0.4.0"
 hyper = "1.3.1"
 tower = "0.4.13"
 tower-http = { version = "0.5.2", features = ["request-id", "tracing", "trace", "util"] }
-uuid = { version = "1.9.1", features = ["v4"] }
-amqp_serde = "0.4.1"
-sysinfo = "0.30.12"

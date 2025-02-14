@@ -1,5 +1,5 @@
 # local development config file for the SSE client
-other_proxy: 
+other_proxy:
   url: "http://localhost:8080/subscribe"
   username: dummy_username
   password: dummy_password
@@ -9,5 +9,7 @@ broker:
   host: "127.0.0.1"
   # note: differs from other config file (two separate brokers used)
   port: 5673
+# use amqp topic notation, note that the system is different from the other configuration
+topic_prefix: "organization.facility.system2"  # CHANGE THIS PER DEPLOYMENT!!!
 log_level: "debug"
 production: false

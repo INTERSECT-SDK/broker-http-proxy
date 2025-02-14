@@ -1,4 +1,5 @@
-use axum::{routing::get, serve::Serve, Router};
+use axum::{routing::get, routing::post, serve::Serve, Router};
+use deadpool_amqprs::Pool;
 use secrecy::Secret;
 use std::sync::Arc;
 use tokio::net::TcpListener;
@@ -13,14 +14,19 @@ use tracing::Level;
 use crate::{
     broadcaster::Broadcaster,
     configuration::Settings,
-    routes::{health_check::health_check, not_found::handler_404, subscribe::sse_handler},
+    routes::{
+        health_check::health_check, not_found::handler_404, publish::publish_message,
+        subscribe::sse_handler,
+    },
 };
 
 use intersect_ingress_proxy_common::signals::wait_for_os_signal;
 
 /// This is state that can be accessed by any endpoint on the server.
 pub struct WebApplicationState {
-    /// this broadcaster gets messages published to it from one source and can publish many messages from it
+    /// AMQP connection pool for publishing to the broker.
+    pub amqp_connection_pool: Pool,
+    /// this broadcaster gets messages published to it from one source and can publish many messages from it. Use this if an HTTP endpoint needs to react to a subscription.
     pub broadcaster: Arc<Broadcaster>,
     /// basic auth username
     pub username: String,
@@ -38,6 +44,7 @@ impl WebApplication {
     pub async fn build(
         configuration: &Settings,
         broadcaster: Arc<Broadcaster>,
+        amqp_pool: Pool,
     ) -> Result<Self, anyhow::Error> {
         let address = format!(
             "{}:{}",
@@ -50,7 +57,7 @@ impl WebApplication {
         );
         let listener = TcpListener::bind(address).await?;
         let port = listener.local_addr().unwrap().port();
-        let server = run(listener, configuration, broadcaster).await?;
+        let server = run(listener, configuration, broadcaster, amqp_pool).await?;
 
         tracing::info!("Web server is running on port {}", port);
 
@@ -73,6 +80,7 @@ async fn run(
     listener: TcpListener,
     configuration: &Settings,
     broadcaster: Arc<Broadcaster>,
+    amqp_pool: Pool,
 ) -> Result<WebAppServer, anyhow::Error> {
     let middleware = ServiceBuilder::new()
         .set_x_request_id(MakeRequestUuid)
@@ -88,6 +96,7 @@ async fn run(
         .propagate_x_request_id();
 
     let app_state = Arc::new(WebApplicationState {
+        amqp_connection_pool: amqp_pool,
         broadcaster,
         username: configuration.username.clone(),
         password: configuration.password.clone(),
@@ -95,7 +104,7 @@ async fn run(
 
     let app = Router::new()
         .route("/subscribe", get(sse_handler))
-        //.route("/publish", post(publish))
+        .route("/publish", post(publish_message))
         .layer(middleware) // routes added before this layer will be logged, after this layer will not be logged
         .with_state(app_state)
         .route("/healthcheck", get(health_check))

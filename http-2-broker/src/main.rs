@@ -48,7 +48,7 @@ async fn send_message(configuration: &Settings, message: String, broker_data: Ar
     // TODO - we'd ideally like to potentially reuse the channel instead of closing it every time
     // see https://github.com/rdoetjes/rabbit_systeminfo/blob/master/systeminfo/src/main.rs#L84 as an example
     // we NEED to explicitly close the channel, or else problems on the broker may develop
-    let channel = get_channel(&connection).await;
+    let channel = get_channel(&connection).await.unwrap();
 
     let args = BasicPublishArguments::new(INTERSECT_MESSAGE_EXCHANGE, &topic);
     // NOTE: the publish() function takes ownership of the string, if you don't care about logging then don't clone
@@ -147,7 +147,9 @@ pub async fn main() {
     // try to declare the exchange on the broker, fail if not
     // do this outside of the hot loop, we should not try to declare the exchange on every message
     {
-        let channel = get_channel(&connection).await;
+        let channel = get_channel(&connection)
+            .await
+            .expect("Couldn't create initial channel");
         let exchange_result = make_exchange(&channel).await;
         match channel.close().await {
             Ok(_) => {}
