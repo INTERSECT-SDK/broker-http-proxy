@@ -12,6 +12,7 @@ anyhow = { workspace = true }
 amqprs = { workspace = true }
 async-stream = { workspace = true }
 config = { workspace = true }
+deadpool-amqprs = { workspace = true }
 futures = { workspace = true }
 secrecy = { workspace = true }
 serde = { workspace = true }
@@ -19,6 +20,7 @@ serde-aux = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
+uuid = { workspace = true }
 tracing = "0.1.40"
 tracing-bunyan-formatter = "0.3.9"
 tracing-log = "0.2.0"
