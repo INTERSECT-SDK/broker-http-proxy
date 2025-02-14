@@ -5,16 +5,16 @@
 /// 4) if using ONLY a file variable, this is determined from the APP_CONFIG_FILE environment variable (environment variables have higher precedence)
 /// 5) Additional logic can be found in shared-deps/src/configuration.rs
 use intersect_ingress_proxy_common::configuration::{BrokerSettings, LogLevel};
-use secrecy::Secret;
+use secrecy::SecretString;
 
-#[derive(serde::Deserialize, Clone)]
+#[derive(serde::Deserialize, Clone, Debug)]
 pub struct ExternalProxy {
     /// URL for the other ingress proxy we are communicating with
     pub url: String,
     /// Basic authentication credentials for the other proxy
     pub username: String,
     /// Basic authentication credentials for the other proxy
-    pub password: Secret<String>,
+    pub password: SecretString,
 }
 
 #[derive(serde::Deserialize, Clone)]

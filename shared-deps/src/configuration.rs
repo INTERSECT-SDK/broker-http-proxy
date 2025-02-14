@@ -3,15 +3,15 @@
 /// Implementation details are in the "get_configuration" function.
 use std::{fmt::Display, str::FromStr};
 
-use secrecy::Secret;
+use secrecy::SecretString;
 use serde_aux::field_attributes::deserialize_number_from_string;
 
-#[derive(serde::Deserialize, Clone)]
+#[derive(serde::Deserialize, Clone, Debug)]
 pub struct BrokerSettings {
     /// broker username
     pub username: String,
     /// broker password
-    pub password: Secret<String>,
+    pub password: SecretString,
     #[serde(deserialize_with = "deserialize_number_from_string")]
     /// broker port
     pub port: u16,

@@ -29,9 +29,7 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 uuid = { workspace = true }
 intersect-ingress-proxy-common = { path = "../shared-deps", version = "0.1.0" }
-axum = { version = "0.7.5", features = ["macros"] }
-axum-extra = { version = "0.9.3", features = ["typed-header"] }
-headers = "0.4.0"
-hyper = "1.3.1"
-tower = "0.4.13"
-tower-http = { version = "0.5.2", features = ["request-id", "tracing", "trace", "util"] }
+axum = { version = "0.8.1", features = ["macros"] }
+axum-extra = { version = "0.10.0", features = ["typed-header"] }
+tower = "0.5.2"
+tower-http = { version = "0.6.2", features = ["request-id", "tracing", "trace", "util"] }
