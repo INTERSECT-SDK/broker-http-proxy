@@ -4,7 +4,7 @@
 /// 3) if using environment variables, see comment in "get_configuration()" as an example of how nesting works
 /// 4) if using ONLY a file variable, this is determined from the APP_CONFIG_FILE environment variable (environment variables have higher precedence)
 /// 5) Additional logic can be found in shared-deps/src/configuration.rs
-use secrecy::Secret;
+use secrecy::SecretString;
 use serde_aux::field_attributes::deserialize_number_from_string;
 
 use intersect_ingress_proxy_common::configuration::{BrokerSettings, LogLevel};
@@ -23,7 +23,7 @@ pub struct Settings {
     /// username for Basic Authentication
     pub username: String,
     /// password for Basic Authentication
-    pub password: Secret<String>,
+    pub password: SecretString,
     /// set to true for developer-unfriendly settings (currently just log formats)
     pub production: bool,
 }

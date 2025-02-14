@@ -1,6 +1,6 @@
 use axum::{routing::get, routing::post, serve::Serve, Router};
 use deadpool_amqprs::Pool;
-use secrecy::Secret;
+use secrecy::SecretString;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
@@ -31,10 +31,10 @@ pub struct WebApplicationState {
     /// basic auth username
     pub username: String,
     /// basic auth password
-    pub password: Secret<String>,
+    pub password: SecretString,
 }
 
-type WebAppServer = Serve<Router, Router>;
+type WebAppServer = Serve<TcpListener, Router, Router>;
 pub struct WebApplication {
     pub port: u16,
     pub server: WebAppServer,
