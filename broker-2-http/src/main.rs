@@ -1,11 +1,9 @@
 use std::sync::Arc;
 
-use broker_2_http::{
-    amqp_consumer::broker_consumer_loop, broadcaster::Broadcaster, configuration::Settings,
-    webapp::WebApplication,
-};
+use broker_2_http::{broadcaster::Broadcaster, configuration::Settings, webapp::WebApplication};
 
 use intersect_ingress_proxy_common::configuration::get_configuration;
+use intersect_ingress_proxy_common::protocols::amqp::subscribe::broker_consumer_loop;
 use intersect_ingress_proxy_common::protocols::amqp::{
     get_connection_pool, verify_connection_pool,
 };
