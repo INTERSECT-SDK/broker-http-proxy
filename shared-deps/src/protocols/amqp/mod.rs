@@ -10,6 +10,7 @@ use std::time::Duration;
 use crate::{configuration::BrokerSettings, intersect_messaging::INTERSECT_MESSAGE_EXCHANGE};
 
 pub mod publish;
+pub mod subscribe;
 
 pub const APPLICATION_QUEUE_NAME: &str = "http-2-broker";
 

@@ -2,6 +2,8 @@ use axum::response::sse::Event;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
+use intersect_ingress_proxy_common::protocols::amqp::subscribe::Broadcast;
+
 /// This broadcaster is an optimized implementation of a single-producer, multi-consumer channel.
 /// The Broadcaster is effectively the "link" between the broker and the HTTP gateway.
 /// If the broker decides to broadcast data, all SSE clients will asynchronosly receive it.
@@ -41,5 +43,11 @@ impl Broadcaster {
     /// Once the messages are on the other message broker, broker-2-http and http-2-broker don't need to care, handling them will be the SDK's job.
     pub fn broadcast(&self, event: &str) -> usize {
         self.fanout.send(Event::default().data(event)).unwrap_or(0)
+    }
+}
+
+impl Broadcast for Broadcaster {
+    fn publish_event(&self, event: &str) -> bool {
+        self.broadcast(event) != 0
     }
 }

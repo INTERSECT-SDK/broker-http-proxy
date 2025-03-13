@@ -7,19 +7,21 @@ use std::sync::Arc;
 use tokio::sync::Barrier;
 use uuid::Uuid;
 
-use crate::broadcaster::Broadcaster;
-use intersect_ingress_proxy_common::protocols::amqp::{
-    get_channel, verify_connection_pool, APPLICATION_QUEUE_NAME,
-};
-use intersect_ingress_proxy_common::{
+use crate::protocols::amqp::{get_channel, verify_connection_pool, APPLICATION_QUEUE_NAME};
+use crate::{
     intersect_messaging::{make_eventsource_data, should_message_passthrough},
     signals::wait_for_os_signal,
 };
 
+pub trait Broadcast {
+    /// Return true if we can consider the event to be successfully "published"
+    fn publish_event(&self, event: &str) -> bool;
+}
+
 pub async fn broker_consumer_loop(
     amqp_connection_pool: Pool,
     config_topic: String,
-    broadcaster: Arc<Broadcaster>,
+    broadcaster: Arc<impl Broadcast + Send + Sync + 'static>,
     barrier: Arc<Barrier>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
@@ -30,7 +32,7 @@ pub async fn broker_consumer_loop(
 async fn broker_consumer_loop_inner(
     amqp_connection_pool: Pool,
     config_topic: String,
-    broadcaster: Arc<Broadcaster>,
+    broadcaster: Arc<impl Broadcast>,
     barrier: Arc<Barrier>,
 ) {
     let mut needs_reverification = false;
@@ -116,7 +118,7 @@ async fn consume_message(
     msg: ConsumerMessage,
     channel: &Channel,
     config_topic: &str,
-    broadcaster: Arc<Broadcaster>,
+    broadcaster: Arc<impl Broadcast>,
 ) {
     let deliver = msg.deliver.unwrap();
     let content = msg.content.unwrap();
@@ -143,7 +145,7 @@ async fn consume_message(
                     let event = make_eventsource_data(topic, &utf8_data);
                     tracing::debug!("consume delivery {} , data: {}", deliver, event,);
                     // TODO handle this better later, see broadcast() documentation for details.
-                    if broadcaster.broadcast(&event) == 0 {
+                    if !broadcaster.publish_event(&event) {
                         tracing::warn!("Broadcaster did not broadcast to anybody");
                         should_ack = false;
                     }
