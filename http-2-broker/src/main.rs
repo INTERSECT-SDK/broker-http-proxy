@@ -1,10 +1,10 @@
 use std::sync::Arc;
-use std::time::Duration;
 
-use amqprs::{channel::BasicPublishArguments, connection::Connection, BasicProperties};
+use amqprs::{channel::BasicPublishArguments, BasicProperties};
+use deadpool_amqprs::Pool;
 use futures::StreamExt;
 use reqwest_eventsource::{Event, EventSource};
-use tokio::sync::Mutex;
+//use tokio::sync::Barrier;
 
 use http_2_broker::configuration::Settings;
 use intersect_ingress_proxy_common::configuration::get_configuration;
@@ -12,7 +12,7 @@ use intersect_ingress_proxy_common::intersect_messaging::{
     extract_eventsource_data, INTERSECT_MESSAGE_EXCHANGE,
 };
 use intersect_ingress_proxy_common::protocols::amqp::{
-    get_channel, get_connection, is_routing_key_compliant, make_exchange,
+    get_channel, get_connection_pool, is_routing_key_compliant, verify_connection_pool,
 };
 use intersect_ingress_proxy_common::signals::wait_for_os_signal;
 use intersect_ingress_proxy_common::telemetry::{
@@ -22,10 +22,10 @@ use secrecy::ExposeSecret;
 
 /// Data we need to share across multiple closures.
 struct BrokerData {
-    pub connection: Mutex<Connection>,
+    pub amqp_connection_pool: Pool,
 }
 
-async fn send_message(configuration: &Settings, message: String, broker_data: Arc<BrokerData>) {
+async fn send_message(message: String, broker_data: Arc<BrokerData>) {
     let es_data_result = extract_eventsource_data(&message);
     if es_data_result.is_err() {
         return;
@@ -40,14 +40,8 @@ async fn send_message(configuration: &Settings, message: String, broker_data: Ar
     }
     tracing::debug!("Publishing message with topic: {}", &topic);
 
-    let mut connection = broker_data.connection.lock().await;
-    if !connection.is_open() {
-        *connection = get_connection(&configuration.broker, 0).await;
-    }
+    let connection = broker_data.amqp_connection_pool.get().await.unwrap();
 
-    // TODO - we'd ideally like to potentially reuse the channel instead of closing it every time
-    // see https://github.com/rdoetjes/rabbit_systeminfo/blob/master/systeminfo/src/main.rs#L84 as an example
-    // we NEED to explicitly close the channel, or else problems on the broker may develop
     let channel = get_channel(&connection).await.unwrap();
 
     let args = BasicPublishArguments::new(INTERSECT_MESSAGE_EXCHANGE, &topic);
@@ -102,7 +96,7 @@ async fn event_source_loop(configuration: &Settings, broker_data: Arc<BrokerData
                                 tracing::info!("connected to {}", &configuration.other_proxy.url);
                             },
                             Ok(Event::Message(message)) => {
-                                send_message(configuration, message.data, broker_data.clone()).await;
+                                send_message(message.data, broker_data.clone()).await;
                             },
                             Err(err) => {
                                 // will happen if we can't connect to the endpoint OR if the endpoint drops us
@@ -142,48 +136,22 @@ pub async fn main() {
         init_subscriber(subscriber);
     }
 
-    let connection = get_connection(&configuration.broker, 10).await;
-
-    // try to declare the exchange on the broker, fail if not
-    // do this outside of the hot loop, we should not try to declare the exchange on every message
-    {
-        let channel = get_channel(&connection)
-            .await
-            .expect("Couldn't create initial channel");
-        let exchange_result = make_exchange(&channel).await;
-        match channel.close().await {
-            Ok(_) => {}
-            Err(e) => {
-                tracing::warn!(error = ?e, "could not close channel after making exchange");
-            }
-        };
-        if exchange_result.is_err() {
-            let err = exchange_result.unwrap_err();
-            tracing::error!("could not create exchange: {}", err);
-            connection
-                .close()
-                .await
-                .expect("Could not close connection after failed exchange creation");
-            std::process::exit(1);
-        }
+    // set up broker connection pool
+    let pool = get_connection_pool(&configuration.broker).await;
+    if let Err(msg) = verify_connection_pool(&pool).await {
+        tracing::error!(msg);
+        std::process::exit(1);
     }
 
+    //let barrier = Arc::new(Barrier::new(2));
     let broker_data = Arc::new(BrokerData {
-        connection: Mutex::new(connection),
+        amqp_connection_pool: pool.clone(),
     });
 
     let rc = event_source_loop(&configuration, broker_data.clone()).await;
 
-    tracing::info!("Attempting graceful shutdown: No longer listening for events over HTTP, will wait 3 seconds to publish remaining messages");
-    tokio::time::sleep(Duration::from_secs(3)).await;
-    // TODO this has a lifetime issue, can't move it out of the Arc
-    // closing the connection is not quite as important, it won't cause issues on the broker and it should be auto-dropped anyways
-    // match connection.close().await {
-    //     Ok(_) => {}
-    //     Err(err) => {
-    //         tracing::warn!("Couldn't close connection");
-    //     }
-    // };
+    tracing::info!("Attempting graceful shutdown: No longer listening for events over HTTP");
+    // barrier.wait().await;
     tracing::info!("process gracefully shutdown");
     std::process::exit(rc);
 }
