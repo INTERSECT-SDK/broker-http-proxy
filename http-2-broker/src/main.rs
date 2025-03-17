@@ -1,34 +1,30 @@
 use std::sync::Arc;
 
-use amqprs::{channel::BasicPublishArguments, BasicProperties};
 use deadpool_amqprs::Pool;
 use futures::StreamExt;
+use http_2_broker::poster::Poster;
 use reqwest_eventsource::{Event, EventSource};
-//use tokio::sync::Barrier;
+use secrecy::ExposeSecret;
+use tokio::sync::oneshot;
 
 use http_2_broker::configuration::Settings;
 use intersect_ingress_proxy_common::configuration::get_configuration;
-use intersect_ingress_proxy_common::intersect_messaging::{
-    extract_eventsource_data, INTERSECT_MESSAGE_EXCHANGE,
-};
+use intersect_ingress_proxy_common::intersect_messaging::extract_eventsource_data;
 use intersect_ingress_proxy_common::protocols::amqp::{
-    get_channel, get_connection_pool, is_routing_key_compliant, verify_connection_pool,
+    get_channel, get_connection_pool, is_routing_key_compliant, publish::amqp_publish_message,
+    subscribe::broker_consumer_loop, verify_connection_pool,
 };
+use intersect_ingress_proxy_common::server_paths::SUBSCRIBE_URL;
 use intersect_ingress_proxy_common::signals::wait_for_os_signal;
 use intersect_ingress_proxy_common::telemetry::{
     get_json_subscriber, get_pretty_subscriber, init_subscriber,
 };
-use secrecy::ExposeSecret;
 
-/// Data we need to share across multiple closures.
-struct BrokerData {
-    pub amqp_connection_pool: Pool,
-}
-
-async fn send_message(message: String, broker_data: Arc<BrokerData>) {
+/// Return Err only if we weren't able to publish a correct message to the broker, invalid messages are ignored
+async fn send_message(message: String, connection_pool: Pool) -> Result<(), String> {
     let es_data_result = extract_eventsource_data(&message);
     if es_data_result.is_err() {
-        return;
+        return Ok(());
     }
     let (topic, data) = es_data_result.unwrap();
     if !is_routing_key_compliant(&topic) {
@@ -36,42 +32,37 @@ async fn send_message(message: String, broker_data: Arc<BrokerData>) {
             "{} is not a valid AMQP topic name, will not attempt publish",
             topic
         );
-        return;
+        return Ok(());
     }
     tracing::debug!("Publishing message with topic: {}", &topic);
 
-    let connection = broker_data.amqp_connection_pool.get().await.unwrap();
+    let connection = connection_pool.get().await.map_err(|_| {
+        "WARNING: Couldn't get connection, message received from other proxy was NOT published on our own broker."
+            .to_string()
+    })?;
 
-    let channel = get_channel(&connection).await.unwrap();
+    let channel = get_channel(&connection).await.map_err(|_| {
+        "WARNING: Couldn't get channel, message received from other proxy was NOT published on our own broker."
+            .to_string()
+    })?;
 
-    let args = BasicPublishArguments::new(INTERSECT_MESSAGE_EXCHANGE, &topic);
-    // NOTE: the publish() function takes ownership of the string, if you don't care about logging then don't clone
-    match channel
-        .basic_publish(
-            BasicProperties::default().with_persistence(true).finish(),
-            data.clone().into_bytes(),
-            args,
-        )
-        .await
-    {
-        Ok(_) => tracing::debug!("message published successfully: {}", data),
-        Err(e) => {
-            tracing::error!(error = ?e, "could not publish message: {}", data);
-        }
-    };
-    match channel.close().await {
-        Ok(_) => {}
-        Err(e) => {
-            tracing::warn!(error = ?e, "could not close channel");
-        }
-    };
+    match amqp_publish_message(channel, &topic, data).await {
+        Ok(_) => Ok(()),
+        Err(_) => Err(
+            "WARNING: message received from other proxy was NOT published on our own broker."
+                .into(),
+        ),
+    }
 }
 
 /// Return value - exit code to use
-async fn event_source_loop(configuration: &Settings, broker_data: Arc<BrokerData>) -> i32 {
+async fn event_source_loop(configuration: &Settings, connection_pool: Pool) -> i32 {
     let mut es = EventSource::new(
         reqwest::Client::new()
-            .get(&configuration.other_proxy.url)
+            .get(format!(
+                "{}{}",
+                &configuration.other_proxy.url, SUBSCRIBE_URL
+            ))
             .basic_auth(
                 &configuration.other_proxy.username,
                 Some(configuration.other_proxy.password.expose_secret()),
@@ -96,7 +87,9 @@ async fn event_source_loop(configuration: &Settings, broker_data: Arc<BrokerData
                                 tracing::info!("connected to {}", &configuration.other_proxy.url);
                             },
                             Ok(Event::Message(message)) => {
-                                send_message(message.data, broker_data.clone()).await;
+                                if let Err(e) = send_message(message.data, connection_pool.clone()).await {
+                                    tracing::error!(e);
+                                };
                             },
                             Err(err) => {
                                 // will happen if we can't connect to the endpoint OR if the endpoint drops us
@@ -120,7 +113,7 @@ async fn event_source_loop(configuration: &Settings, broker_data: Arc<BrokerData
 }
 
 #[tokio::main]
-pub async fn main() {
+pub async fn main() -> anyhow::Result<()> {
     let configuration = get_configuration::<Settings>().expect("Failed to read configuration");
 
     // Start logging
@@ -143,15 +136,27 @@ pub async fn main() {
         std::process::exit(1);
     }
 
-    //let barrier = Arc::new(Barrier::new(2));
-    let broker_data = Arc::new(BrokerData {
-        amqp_connection_pool: pool.clone(),
-    });
+    // How this works:
+    // - Pass in the receiver to the broker consumer loop
+    // - In the broker consumer loop, use tokio::select! to wait for rx.recv() at key points
+    // - After the Event Source loop has been shut down (either because we're killing the app or because we got a server error),
+    //     drop the sender from memory, which will trigger an rx.recv() command
+    // - This allows us to "finish up" publishing a message to our broker before killing the application.
+    let (tx, rx) = oneshot::channel::<()>();
 
-    let rc = event_source_loop(&configuration, broker_data.clone()).await;
+    let broker_join_handle = broker_consumer_loop(
+        pool.clone(),
+        configuration.topic_prefix.clone(),
+        Arc::new(Poster::new(&configuration.other_proxy)),
+        rx,
+    );
+
+    // this will run until we get an event source error or we catch an OS signal
+    let rc = event_source_loop(&configuration, pool.clone()).await;
 
     tracing::info!("Attempting graceful shutdown: No longer listening for events over HTTP");
-    // barrier.wait().await;
-    tracing::info!("process gracefully shutdown");
+    drop(tx);
+    broker_join_handle.await?;
+
     std::process::exit(rc);
 }

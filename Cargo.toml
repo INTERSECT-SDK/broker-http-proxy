@@ -25,3 +25,4 @@ uuid = { version = "1.13.1", features = ["v4"] }
 [workspace.package]
 version = "0.1.0"
 publish = false
+rust-version = "1.84.0"

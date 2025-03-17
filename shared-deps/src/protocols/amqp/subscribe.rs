@@ -2,38 +2,43 @@ use amqprs::channel::{
     BasicAckArguments, BasicCancelArguments, BasicConsumeArguments, BasicRejectArguments, Channel,
     ConsumerMessage,
 };
+
 use deadpool_amqprs::Pool;
 use std::sync::Arc;
-use tokio::sync::Barrier;
+use tokio::sync::oneshot::Receiver;
 use uuid::Uuid;
 
+use crate::intersect_messaging::{make_eventsource_data, should_message_passthrough};
 use crate::protocols::amqp::{get_channel, verify_connection_pool, APPLICATION_QUEUE_NAME};
-use crate::{
-    intersect_messaging::{make_eventsource_data, should_message_passthrough},
-    signals::wait_for_os_signal,
-};
 
-pub trait Broadcast {
+/// Trait which should be implemented by the application to handle a formatted message, ready to send to a server or clients
+pub trait HttpBroadcast {
     /// Return true if we can consider the event to be successfully "published"
-    fn publish_event(&self, event: &str) -> bool;
+    /// note that this does not *have* to have an asynchronous internal implementation, it should just allow for one
+    fn publish_event_to_http(
+        &self,
+        event: String,
+    ) -> impl std::future::Future<Output = bool> + Send;
 }
 
-pub async fn broker_consumer_loop(
+pub fn broker_consumer_loop(
     amqp_connection_pool: Pool,
     config_topic: String,
-    broadcaster: Arc<impl Broadcast + Send + Sync + 'static>,
-    barrier: Arc<Barrier>,
+    broadcaster: Arc<impl HttpBroadcast + Send + Sync + 'static>,
+    killswitch: Receiver<()>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
-        broker_consumer_loop_inner(amqp_connection_pool, config_topic, broadcaster, barrier).await
+        broker_consumer_loop_inner(amqp_connection_pool, config_topic, broadcaster, killswitch)
+            .await
     })
 }
 
 async fn broker_consumer_loop_inner(
     amqp_connection_pool: Pool,
     config_topic: String,
-    broadcaster: Arc<impl Broadcast>,
-    barrier: Arc<Barrier>,
+    broadcaster: Arc<impl HttpBroadcast + Send + Sync + 'static>,
+    // calls recv() once the EventSource loop or HTTP server catches an OS signal
+    mut killswitch: Receiver<()>,
 ) {
     let mut needs_reverification = false;
     'connection_loop: loop {
@@ -41,13 +46,15 @@ async fn broker_consumer_loop_inner(
         if connection.is_err() {
             needs_reverification = true;
             tracing::warn!("Consumer lost connection to broker, retrying in 5 seconds");
-            let future = tokio::time::sleep(std::time::Duration::from_secs(5));
-            tokio::pin!(future);
+            let retry_wait = tokio::time::sleep(std::time::Duration::from_secs(5));
+            tokio::pin!(retry_wait);
             tokio::select! {
-                _ = wait_for_os_signal() => {
+                _ = &mut killswitch => {
+                    // HTTP component has been shut down, no point in waiting
+                    tracing::warn!("Shutting down while attempting to reconnect to broker");
                     break;
                 },
-                _ = &mut future => {
+                _ = &mut retry_wait => {
                     continue;
                 },
             }
@@ -87,8 +94,7 @@ async fn broker_consumer_loop_inner(
         let (consumer_tag, mut messages_rx) = consume_result.unwrap();
         loop {
             tokio::select! {
-                // OS kill signal
-                _ = wait_for_os_signal() => {
+                _ = &mut killswitch => {
                     // attempt cleanup before terminating
                     tracing::warn!("Received terminate signal from OS, attempting to gracefully disconnect from AMQP broker...");
                     cleanup(consumer_tag, channel).await;
@@ -97,7 +103,7 @@ async fn broker_consumer_loop_inner(
                 },
                 consumer_result = messages_rx.recv() => {
                     match consumer_result {
-                        Some(msg) => consume_message(msg, &channel, &config_topic, broadcaster.clone()).await,
+                        Some(msg) => consume_message(msg, &channel, &config_topic, broadcaster.clone(), &mut killswitch).await,
                         None => {
                             tracing::warn!("Messages channel was suddenly closed, will try to reconnect");
                             break;
@@ -110,7 +116,6 @@ async fn broker_consumer_loop_inner(
         // if we reach this, the channel has been closed from the messages_rx object (most likely from a broker disconnect), so we will clean up and then attempt reconnection
         cleanup(consumer_tag, channel).await;
     }
-    barrier.wait().await;
 }
 
 /// domain logic for handling a message from the broker
@@ -118,7 +123,8 @@ async fn consume_message(
     msg: ConsumerMessage,
     channel: &Channel,
     config_topic: &str,
-    broadcaster: Arc<impl Broadcast>,
+    broadcaster: Arc<impl HttpBroadcast + Send + Sync + 'static>,
+    killswitch: &mut Receiver<()>,
 ) {
     let deliver = msg.deliver.unwrap();
     let content = msg.content.unwrap();
@@ -132,7 +138,7 @@ async fn consume_message(
     tracing::debug!("consume delivery {}", deliver);
     match String::from_utf8(content) {
         Ok(utf8_data) => {
-            tracing::debug!("raw message data: {}", &utf8_data);
+            tracing::debug!("got raw message data from broker: {}", &utf8_data);
             match should_message_passthrough(&utf8_data, config_topic) {
                 Err(e) => {
                     tracing::error!(error = ?e, "message is valid UTF-8 but not INTERSECT JSON");
@@ -145,9 +151,20 @@ async fn consume_message(
                     let event = make_eventsource_data(topic, &utf8_data);
                     tracing::debug!("consume delivery {} , data: {}", deliver, event,);
                     // TODO handle this better later, see broadcast() documentation for details.
-                    if !broadcaster.publish_event(&event) {
-                        tracing::warn!("Broadcaster did not broadcast to anybody");
-                        should_ack = false;
+                    tracing::info!("Preparing to publish event");
+                    tokio::select! {
+                        _ = killswitch => {
+                            // WARNING: in the client implementation, this may happen while waiting on a response, resulting in us rejecting a message we actually passed through successfully
+                            // this would only happen if we actually call publish_event_to_http(), if the killswitch was toggled before reaching here we will always do the killswitch branch.
+                            tracing::warn!("Got message from broker but did not send it over HTTP, the message will be rejected.");
+                            should_ack = false;
+                        },
+                        http_result = broadcaster.publish_event_to_http(event) => {
+                            if !http_result {
+                                tracing::warn!("Some clients may not have gotten a message, the message will be rejected.");
+                                should_ack = false;
+                            }
+                        },
                     }
                 }
             }
@@ -166,10 +183,7 @@ async fn consume_message(
         };
     } else {
         // We don't acknowledge or reject the message, so we immediately get the message back.
-        tracing::warn!(
-            "Some clients probably did not get delivery {}, not acknowledging the message",
-            deliver,
-        );
+        tracing::warn!("Rejecting delivery {}", deliver,);
         // TODO - if we're able to determine SPECIFIC clients who did/did not get it, we may want to explicitly reject the message.
         match channel
             .basic_reject(BasicRejectArguments::new(deliver.delivery_tag(), true))
