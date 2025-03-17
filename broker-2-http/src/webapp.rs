@@ -20,6 +20,7 @@ use crate::{
     },
 };
 
+use intersect_ingress_proxy_common::server_paths::{PUBLISH_URL, SUBSCRIBE_URL};
 use intersect_ingress_proxy_common::signals::wait_for_os_signal;
 
 /// This is state that can be accessed by any endpoint on the server.
@@ -36,8 +37,8 @@ pub struct WebApplicationState {
 
 type WebAppServer = Serve<TcpListener, Router, Router>;
 pub struct WebApplication {
-    pub port: u16,
-    pub server: WebAppServer,
+    port: u16,
+    server: WebAppServer,
 }
 
 impl WebApplication {
@@ -103,8 +104,8 @@ async fn run(
     });
 
     let app = Router::new()
-        .route("/subscribe", get(sse_handler))
-        .route("/publish", post(publish_message))
+        .route(SUBSCRIBE_URL, get(sse_handler))
+        .route(PUBLISH_URL, post(publish_message))
         .layer(middleware) // routes added before this layer will be logged, after this layer will not be logged
         .with_state(app_state)
         .route("/healthcheck", get(health_check))

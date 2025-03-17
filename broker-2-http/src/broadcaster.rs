@@ -2,7 +2,7 @@ use axum::response::sse::Event;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
-use intersect_ingress_proxy_common::protocols::amqp::subscribe::Broadcast;
+use intersect_ingress_proxy_common::protocols::amqp::subscribe::HttpBroadcast;
 
 /// This broadcaster is an optimized implementation of a single-producer, multi-consumer channel.
 /// The Broadcaster is effectively the "link" between the broker and the HTTP gateway.
@@ -46,8 +46,8 @@ impl Broadcaster {
     }
 }
 
-impl Broadcast for Broadcaster {
-    fn publish_event(&self, event: &str) -> bool {
-        self.broadcast(event) != 0
+impl HttpBroadcast for Broadcaster {
+    async fn publish_event_to_http(&self, event: String) -> bool {
+        self.broadcast(&event) != 0
     }
 }

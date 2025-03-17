@@ -7,7 +7,8 @@ broker:
   # note: differs from other config file (two separate brokers used)
   port: 5672
 # use amqp topic notation
-topic_prefix: "organization.facility.system"  # CHANGE THIS PER DEPLOYMENT!!!
+# TODO: current implementation requires this to end with a "." character, this should be fixed...
+topic_prefix: "organization.facility.system."  # CHANGE THIS PER DEPLOYMENT!!!
 log_level: "debug"
 username: dummy_username
 password: dummy_password
