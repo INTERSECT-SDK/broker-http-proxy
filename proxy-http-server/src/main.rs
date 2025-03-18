@@ -13,6 +13,8 @@ use proxy_http_server::{
     broadcaster::Broadcaster, configuration::Settings, webapp::WebApplication,
 };
 
+const APPLICATION_NAME: &str = "proxy-http-server";
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let configuration = get_configuration::<Settings>().expect("Failed to read configuration");
@@ -20,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
     // Start logging
     if configuration.production {
         let subscriber = get_json_subscriber(
-            "proxy-http-server".into(),
+            APPLICATION_NAME.into(),
             configuration.log_level.to_string(),
             std::io::stderr,
         );
@@ -32,7 +34,7 @@ async fn main() -> anyhow::Result<()> {
 
     // set up broker connection pool
     let pool = get_connection_pool(&configuration.broker).await;
-    if let Err(msg) = verify_connection_pool(&pool).await {
+    if let Err(msg) = verify_connection_pool(&pool, APPLICATION_NAME).await {
         tracing::error!(msg);
         std::process::exit(1);
     }
@@ -46,19 +48,20 @@ async fn main() -> anyhow::Result<()> {
     // - In the broker consumer loop, use tokio::select! to wait for rx.recv() at key points
     // - After the HTTP server has been shut down, drop the sender from memory, which will trigger an rx.recv() command
     // - This allows us to "finish up" publishing a message to our broker before killing the application.
-    let (tx, rx) = oneshot::channel::<()>();
+    let (tx, rx) = oneshot::channel();
 
     let broker_join_handle = broker_consumer_loop(
         pool,
         configuration.topic_prefix.clone(),
+        APPLICATION_NAME.into(),
         broadcaster.clone(),
         rx,
     );
 
     application.run_until_stopped().await?;
-    tracing::warn!("Application shutting down, please wait for cleanups...");
-    drop(tx);
 
+    tracing::info!("Application shutting down, please wait for cleanups...");
+    drop(tx);
     broker_join_handle.await?;
 
     Ok(())

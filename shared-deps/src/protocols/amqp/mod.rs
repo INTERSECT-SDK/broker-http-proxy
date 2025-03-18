@@ -11,13 +11,9 @@ use crate::{configuration::BrokerSettings, intersect_messaging::INTERSECT_MESSAG
 pub mod publish;
 pub mod subscribe;
 
-pub const APPLICATION_QUEUE_NAME: &str = "proxy-http-client";
-
 /// Get an AMQP connection pool, this pool will manage all connections to the broker
 ///
 /// NOTE: calling this function cannot fail on its own, you have to call pool.get().await for it to fail
-///
-/// usually, you can just wait for it to fail in the subscriber
 pub async fn get_connection_pool(connection_details: &BrokerSettings) -> Pool {
     let mut args = OpenConnectionArguments::new(
         &connection_details.host,
@@ -32,7 +28,7 @@ pub async fn get_connection_pool(connection_details: &BrokerSettings) -> Pool {
 }
 
 /// This is our initial verification step. We will make sure that we can connect and that the exchanges/queues are set up.
-pub async fn verify_connection_pool(pool: &Pool) -> Result<(), String> {
+pub async fn verify_connection_pool(pool: &Pool, queue_name_src: &str) -> Result<(), String> {
     let connection = pool
         .get()
         .await
@@ -49,11 +45,9 @@ pub async fn verify_connection_pool(pool: &Pool) -> Result<(), String> {
     // we'll use a persistent queue named "proxy-http-client", as there should only be one proxy-http-server deployment per System
     // TODO - note that we should probably name queues larger than 127 characters with a hashed key
     let (queue_name, _, _) = channel
-        .queue_declare(QueueDeclareArguments::durable_client_named(
-            APPLICATION_QUEUE_NAME,
-        ))
+        .queue_declare(QueueDeclareArguments::durable_client_named(queue_name_src))
         .await
-        .map_err(|_| format!("Couldn't declare the {} queue", APPLICATION_QUEUE_NAME))?
+        .map_err(|_| format!("Couldn't declare the {} queue", queue_name_src))?
         .expect("didn't get correct args back from queue declaration"); // unlikely this pops
 
     // listen for every single message on the exchange, we must do this due to the way userspace messages work
@@ -67,7 +61,7 @@ pub async fn verify_connection_pool(pool: &Pool) -> Result<(), String> {
         .map_err(|_| {
             format!(
                 "Couldn't bind the {} exchange to the {} queue",
-                INTERSECT_MESSAGE_EXCHANGE, APPLICATION_QUEUE_NAME
+                INTERSECT_MESSAGE_EXCHANGE, &queue_name
             )
         })?;
     channel

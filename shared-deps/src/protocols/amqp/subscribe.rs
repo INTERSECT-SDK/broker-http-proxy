@@ -9,7 +9,7 @@ use tokio::sync::oneshot::Receiver;
 use uuid::Uuid;
 
 use crate::intersect_messaging::{make_eventsource_data, should_message_passthrough};
-use crate::protocols::amqp::{get_channel, verify_connection_pool, APPLICATION_QUEUE_NAME};
+use crate::protocols::amqp::{get_channel, verify_connection_pool};
 
 /// Trait which should be implemented by the application to handle a formatted message, ready to send to a server or clients
 pub trait HttpBroadcast {
@@ -24,18 +24,26 @@ pub trait HttpBroadcast {
 pub fn broker_consumer_loop(
     amqp_connection_pool: Pool,
     config_topic: String,
+    queue_name_src: String,
     broadcaster: Arc<impl HttpBroadcast + Send + Sync + 'static>,
     killswitch: Receiver<()>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
-        broker_consumer_loop_inner(amqp_connection_pool, config_topic, broadcaster, killswitch)
-            .await
+        broker_consumer_loop_inner(
+            amqp_connection_pool,
+            config_topic,
+            queue_name_src,
+            broadcaster,
+            killswitch,
+        )
+        .await
     })
 }
 
 async fn broker_consumer_loop_inner(
     amqp_connection_pool: Pool,
     config_topic: String,
+    queue_name_src: String,
     broadcaster: Arc<impl HttpBroadcast + Send + Sync + 'static>,
     // calls recv() once the EventSource loop or HTTP server catches an OS signal
     mut killswitch: Receiver<()>,
@@ -61,7 +69,7 @@ async fn broker_consumer_loop_inner(
         }
 
         if needs_reverification {
-            if let Err(e) = verify_connection_pool(&amqp_connection_pool).await {
+            if let Err(e) = verify_connection_pool(&amqp_connection_pool, &queue_name_src).await {
                 tracing::warn!(error = ?e, "Couldn't fully recover broker setup");
                 continue;
             }
@@ -76,7 +84,7 @@ async fn broker_consumer_loop_inner(
         let channel = channel_result.unwrap();
 
         // Do NOT automatically acknowledge messages, we may not be able to forward them.
-        let args = BasicConsumeArguments::new(APPLICATION_QUEUE_NAME, &Uuid::new_v4().to_string())
+        let args = BasicConsumeArguments::new(&queue_name_src, &Uuid::new_v4().to_string())
             .manual_ack(true) // only ack messages we should actually publish, we will nack the others
             .finish();
 
@@ -141,17 +149,19 @@ async fn consume_message(
             tracing::debug!("got raw message data from broker: {}", &utf8_data);
             match should_message_passthrough(&utf8_data, config_topic) {
                 Err(e) => {
-                    tracing::error!(error = ?e, "message is valid UTF-8 but not INTERSECT JSON");
+                    // This should generally not be seen, so log it as a warning
+                    tracing::warn!(error = ?e, "message is valid UTF-8 but not INTERSECT JSON");
                 }
                 Ok(false) => {
-                    tracing::warn!("message source is not from this system, will not broadcast it");
+                    tracing::debug!(
+                        "message source is not from this system, will not broadcast it"
+                    );
                 }
                 Ok(true) => {
                     let topic = deliver.routing_key();
                     let event = make_eventsource_data(topic, &utf8_data);
                     tracing::debug!("consume delivery {} , data: {}", deliver, event,);
                     // TODO handle this better later, see broadcast() documentation for details.
-                    tracing::info!("Preparing to publish event");
                     tokio::select! {
                         _ = killswitch => {
                             // WARNING: in the client implementation, this may happen while waiting on a response, resulting in us rejecting a message we actually passed through successfully
@@ -170,6 +180,7 @@ async fn consume_message(
             }
         }
         Err(e) => {
+            // this should generally not be seen, so log as an error
             tracing::error!(error = ?e, "message data is not UTF-8, cannot be forwarded over SSE");
         }
     }
@@ -190,7 +201,7 @@ async fn consume_message(
             .await
         {
             Ok(_) => {}
-            Err(e) => tracing::error!(error = ?e, "manual nack did not work"),
+            Err(e) => tracing::error!(error = ?e, "manual reject did not work"),
         };
     }
 }

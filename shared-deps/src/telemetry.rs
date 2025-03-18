@@ -8,8 +8,7 @@ use tracing_subscriber::{fmt::MakeWriter, layer::SubscriberExt, EnvFilter, Regis
 ///
 /// This one uses a "pretty" format which is easier for developers to directly read in a terminal.
 pub fn get_pretty_subscriber(env_filter_arg: String) -> impl Subscriber + Send + Sync {
-    let env_filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(env_filter_arg));
+    let env_filter = EnvFilter::new(env_filter_arg);
     Registry::default()
         .with(env_filter)
         .with(tracing_subscriber::fmt::layer().pretty())
@@ -27,8 +26,7 @@ pub fn get_json_subscriber<Sink>(
 where
     Sink: for<'a> MakeWriter<'a> + Send + Sync + 'static,
 {
-    let env_filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(env_filter_arg));
+    let env_filter = EnvFilter::new(env_filter_arg);
     Registry::default()
         .with(env_filter)
         .with(JsonStorageLayer)

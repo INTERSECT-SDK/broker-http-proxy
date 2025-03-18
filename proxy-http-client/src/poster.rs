@@ -1,6 +1,7 @@
+use secrecy::ExposeSecret;
+
 use intersect_ingress_proxy_common::protocols::amqp::subscribe::HttpBroadcast;
 use intersect_ingress_proxy_common::server_paths::PUBLISH_URL;
-use secrecy::ExposeSecret;
 
 use crate::configuration::ExternalProxy;
 
