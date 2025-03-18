@@ -28,6 +28,6 @@ pub struct Settings {
     pub log_level: LogLevel,
     /// set to true for developer-unfriendly settings (currently just log formats)
     pub production: bool,
-    /// this should only contain the SYSTEM prefix, i.e. "organization.facility.system"
+    /// this should only contain the SYSTEM prefix, i.e. "organization.facility.system."
     pub topic_prefix: String,
 }
