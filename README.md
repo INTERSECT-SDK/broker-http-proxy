@@ -15,6 +15,10 @@ If you had already added this repo earlier, run `helm repo update` to retrieve
 the latest versions of the packages.  You can then run `helm search repo <alias>` to see the charts.
 
 Available charts:
+- `proxy-http-server`
+- `proxy-http-client`
+
+The following charts are DEPRECATED and should not be used:
 - `broker-2-http`
 - `http-2-broker`
 
@@ -29,10 +33,10 @@ To uninstall the chart:
 If using an umbrella chart, add these lines to your `dependencies` section (change `version` accordingly):
 
 ```yaml
-  - name: broker-2-http
+  - name: proxy-http-server
     repository: https://intersect-sdk.github.io/broker-http-proxy/
     version: "0.1.0"
-  - name: http-2-broker
+  - name: proxy-http-client
     repository: https://intersect-sdk.github.io/broker-http-proxy/
     version: "0.1.0"
 ```
