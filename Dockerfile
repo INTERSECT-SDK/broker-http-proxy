@@ -15,7 +15,10 @@ RUN cargo chef prepare --bin ${BIN_NAME} --recipe-path recipe.json
 
 FROM chef AS builder
 ARG BIN_NAME
-RUN apt update -y && apt upgrade -y && apt install -y --no-install-recommends pkg-config libssl-dev
+RUN apt update -y && apt install -y --no-install-recommends \
+  pkg-config \
+  libssl-dev \
+  && rm -rf /var/lib/apt/lists/*
 COPY --from=planner /app/recipe.json recipe.json
 # Build dependencies - this is the caching Docker layer!
 RUN cargo chef cook --release --bin ${BIN_NAME} --recipe-path recipe.json
@@ -27,7 +30,9 @@ RUN cargo build --release --bin ${BIN_NAME}
 FROM debian:stable-slim AS runtime
 ARG BIN_NAME
 WORKDIR /app
-RUN apt update -y && apt upgrade -y && apt install -y --no-install-recommends pkg-config libssl-dev ca-certificates
+RUN apt update -y && apt install -y --no-install-recommends \
+  ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/target/release/${BIN_NAME} /app/bin
 ENV PROXYAPP_PRODUCTION="true"
 ENTRYPOINT ["/app/bin"]
