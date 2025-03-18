@@ -32,8 +32,8 @@ spec:
       {{- include "common.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) | nindent 8 }}
       {{- end }}
     spec:
-      serviceAccountName: {{ template "intersect-http-2-broker.serviceAccountName" . }}
-      {{- include "intersect-http-2-broker.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ template "intersect-proxy-http-server.serviceAccountName" . }}
+      {{- include "intersect-proxy-http-server.imagePullSecrets" . | nindent 6 }}
       {{- if .Values.hostAliases }}
       hostAliases: {{- include "common.tplvalues.render" ( dict "value" .Values.hostAliases "context" $ ) | nindent 8 }}
       {{- end }}
@@ -72,7 +72,7 @@ spec:
       {{- end }}
       containers:
         - name: {{ .Chart.Name }}
-          image: {{ template "intersect-http-2-broker.image" . }}
+          image: {{ template "intersect-proxy-http-server.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if .Values.containerSecurityContext.enabled }}
           securityContext: {{- omit .Values.containerSecurityContext "enabled" | toYaml | nindent 12 }}
@@ -87,6 +87,9 @@ spec:
           {{- else if .Values.args }}
           args: {{- include "common.tplvalues.render" (dict "value" .Values.args "context" $) | nindent 12 }}
           {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.containerPort }}
           env:
             - name: PROXYAPP_PRODUCTION
               value: "true"
@@ -107,14 +110,14 @@ spec:
               value: {{ .Values.app.broker.host | quote }}
             - name: PROXYAPP_BROKER__PORT
               value: {{ .Values.app.broker.port | quote }}
-            - name: PROXYAPP_OTHER_PROXY__URL
-              value: {{ .Values.app.other_proxy.url | quote }}
-            - name: PROXYAPP_OTHER_PROXY__USERNAME
-              value: {{ .Values.app.other_proxy.username | quote }}
-            - name: PROXYAPP_OTHER_PROXY__PASSWORD
-              value: {{ .Values.app.other_proxy.password | quote }}
+            - name: PROXYAPP_APP_PORT
+              value: {{ .Values.containerPort | quote }}
             - name: PROXYAPP_TOPIC_PREFIX
               value: {{ required "app.topic_prefix not set (i.e. 'organization.facility.system.')" .Values.app.topic_prefix | quote }}
+            - name: PROXYAPP_USERNAME
+              value: {{ .Values.app.username | quote }}
+            - name: PROXYAPP_PASSWORD
+              value: {{ .Values.app.password | quote }}
           envFrom:
             {{- if .Values.extraEnvVarsCM }}
             - configMapRef:
@@ -130,12 +133,26 @@ spec:
           {{- if not .Values.diagnosticMode.enabled }}
           {{- if .Values.customLivenessProbe }}
           livenessProbe: {{- include "common.tplvalues.render" (dict "value" .Values.customLivenessProbe "context" $) | nindent 12 }}
+          {{- else if .Values.livenessProbe.enabled }}
+          livenessProbe: {{- include "common.tplvalues.render" (dict "value" (omit .Values.livenessProbe "enabled") "context" $) | nindent 12 }}
+            httpGet:
+              path: /healthcheck
+              port: http
           {{- end }}
           {{- if .Values.customReadinessProbe }}
           readinessProbe: {{- include "common.tplvalues.render" (dict "value" .Values.customReadinessProbe "context" $) | nindent 12 }}
+          {{- else if .Values.readinessProbe.enabled }}
+          readinessProbe: {{- include "common.tplvalues.render" (dict "value" (omit .Values.readinessProbe "enabled") "context" $) | nindent 12 }}
+            httpGet:
+              path: /healthcheck
+              port: http
           {{- end }}
           {{- if .Values.customStartupProbe }}
           startupProbe: {{- include "common.tplvalues.render" (dict "value" .Values.customStartupProbe "context" $) | nindent 12 }}
+          {{- else if .Values.startupProbe.enabled }}
+          startupProbe: {{- include "common.tplvalues.render" (dict "value" (omit .Values.startupProbe "enabled") "context" $) | nindent 12 }}
+            tcpSocket:
+              port: http
           {{- end }}
           {{- end }}
           {{- if .Values.lifecycleHooks }}

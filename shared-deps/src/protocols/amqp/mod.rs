@@ -11,7 +11,7 @@ use crate::{configuration::BrokerSettings, intersect_messaging::INTERSECT_MESSAG
 pub mod publish;
 pub mod subscribe;
 
-pub const APPLICATION_QUEUE_NAME: &str = "http-2-broker";
+pub const APPLICATION_QUEUE_NAME: &str = "proxy-http-client";
 
 /// Get an AMQP connection pool, this pool will manage all connections to the broker
 ///
@@ -46,7 +46,7 @@ pub async fn verify_connection_pool(pool: &Pool) -> Result<(), String> {
         "Couldn't make the INTERSECT exchange or confirm that it exists.".to_string()
     })?;
 
-    // we'll use a persistent queue named "http-2-broker", as there should only be one broker-2-http deployment per System
+    // we'll use a persistent queue named "proxy-http-client", as there should only be one proxy-http-server deployment per System
     // TODO - note that we should probably name queues larger than 127 characters with a hashed key
     let (queue_name, _, _) = channel
         .queue_declare(QueueDeclareArguments::durable_client_named(

@@ -54,11 +54,11 @@ jobs:
       matrix:
         include:
           - build_args: |
-              BIN_NAME=broker-2-http
-            app_name: broker-2-http
+              BIN_NAME=proxy-http-server
+            app_name: proxy-http-server
           - build_args: |
-              BIN_NAME=http-2-broker
-            app_name: http-2-broker
+              BIN_NAME=proxy-http-client
+            app_name: proxy-http-client
 
     steps:
       - uses: actions/checkout@v4

@@ -1,7 +1,7 @@
 [workspace]
-members = ["broker-2-http", "http-2-broker", "shared-deps"]
+members = ["proxy-http-server", "proxy-http-client", "shared-deps"]
 # Only check / build main crates by default (check all with `--workspace`)
-default-members = ["broker-2-http", "http-2-broker",]
+default-members = ["proxy-http-server", "proxy-http-client",]
 resolver = "2"
 
 # shared dependencies across all applications

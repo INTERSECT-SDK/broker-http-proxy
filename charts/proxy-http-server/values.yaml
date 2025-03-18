@@ -28,7 +28,7 @@ diagnosticMode:
 
 image:
   registry: ghcr.io
-  repository: intersect-sdk/broker-http-proxy/http-2-broker
+  repository: intersect-sdk/broker-http-proxy/proxy-http-server
   tag: "latest"
   digest: ""
   pullPolicy: ""
@@ -36,29 +36,31 @@ image:
 
 replicaCount: 1
 
-#livenessProbe: # the application developers should help determine sane default params
-  #enabled: true
-  #initialDelaySeconds: 30
-  #periodSeconds: 5
-  #timeoutSeconds: 10
-  #failureThreshold: 6
-  #successThreshold: 1
+containerPort: 8080
 
-#readinessProbe: # the application developers should help determine sane default params
-  #enabled: true
-  #initialDelaySeconds: 5
-  #timeoutSeconds: 3
-  #periodSeconds: 5
-  #failureThreshold: 3
-  #successThreshold: 1
+livenessProbe: # the application developers should help determine sane default params
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 5
+  timeoutSeconds: 10
+  failureThreshold: 6
+  successThreshold: 1
 
-#startupProbe: # the application developers should help determine sane default params
-  #enabled: false
-  #initialDelaySeconds: 30
-  #periodSeconds: 5
-  #timeoutSeconds: 10
-  #failureThreshold: 6
-  #successThreshold: 1
+readinessProbe: # the application developers should help determine sane default params
+  enabled: true
+  initialDelaySeconds: 5
+  timeoutSeconds: 3
+  periodSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+startupProbe: # the application developers should help determine sane default params
+  enabled: false
+  initialDelaySeconds: 30
+  periodSeconds: 5
+  timeoutSeconds: 10
+  failureThreshold: 6
+  successThreshold: 1
 
 customLivenessProbe: {}
 customReadinessProbe: {}
@@ -116,6 +118,36 @@ extraEnvVarsSecret: ""
 initContainers: []
 sidecars: []
 
+### Traffic exposure ###
+
+service:
+  type: ClusterIP
+  port: 8080
+  # make sure this is a number
+  nodePort: ""
+  clusterIP: ""
+  loadBalancerIP: ""
+  loadBalancerSourceRanges: []
+  externalTrafficPolicy: Cluster
+  annotations: {}
+  sessionAffinity: None
+  sessionAffinityConfig: {}
+
+ingress:
+  enabled: false
+  pathType: ImplementationSpecific
+  hostname: ""
+  ingressClassName: ""
+  path: /
+  annotations: {}
+  tls: false
+  selfSigned: false
+  extraHosts: []
+  extraPaths: []
+  extraTls: []
+  secrets: []
+  extraRules: []
+
 ### Kubernetes role stuff
 
 serviceAccount:
@@ -129,10 +161,8 @@ serviceAccount:
 app:
   log_level: "info"
   topic_prefix: "" # i.e. "organization.facility.system.", you should consciously set this value. It MUST end with a "."
-  other_proxy:
-    url: "" # this should not include the path or a trailing slash
-    username: "" # needed credential for clients calling HTTP endpoints other than /healthcheck
-    password: "" # needed credential for clients calling HTTP endpoints other than /healthcheck
+  username: "" # needed credential for clients calling HTTP endpoints other than /healthcheck
+  password: "" # needed credential for clients calling HTTP endpoints other than /healthcheck
   broker:
     host: "127.0.0.1"
     port: "5672"

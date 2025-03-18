@@ -2,12 +2,11 @@ use std::sync::Arc;
 
 use deadpool_amqprs::Pool;
 use futures::StreamExt;
-use http_2_broker::poster::Poster;
+use proxy_http_client::poster::Poster;
 use reqwest_eventsource::{Event, EventSource};
 use secrecy::ExposeSecret;
 use tokio::sync::oneshot;
 
-use http_2_broker::configuration::Settings;
 use intersect_ingress_proxy_common::configuration::get_configuration;
 use intersect_ingress_proxy_common::intersect_messaging::extract_eventsource_data;
 use intersect_ingress_proxy_common::protocols::amqp::{
@@ -19,6 +18,7 @@ use intersect_ingress_proxy_common::signals::wait_for_os_signal;
 use intersect_ingress_proxy_common::telemetry::{
     get_json_subscriber, get_pretty_subscriber, init_subscriber,
 };
+use proxy_http_client::configuration::Settings;
 
 /// Return Err only if we weren't able to publish a correct message to the broker, invalid messages are ignored
 async fn send_message(message: String, connection_pool: Pool) -> Result<(), String> {
@@ -119,7 +119,7 @@ pub async fn main() -> anyhow::Result<()> {
     // Start logging
     if configuration.production {
         let subscriber = get_json_subscriber(
-            "http-2-broker".into(),
+            "proxy-http-client".into(),
             configuration.log_level.to_string(),
             std::io::stderr,
         );

@@ -40,7 +40,7 @@ impl Broadcaster {
     /// 2) for each client who DIDN'T, NACK the message on a special exchange (dedicated to these clients).
     /// 3) Somehow transfer these messages over to the other message broker, make the messages their responsibility.
     ///
-    /// Once the messages are on the other message broker, broker-2-http and http-2-broker don't need to care, handling them will be the SDK's job.
+    /// Once the messages are on the other message broker, proxy-http-server and proxy-http-client don't need to care, handling them will be the SDK's job.
     pub fn broadcast(&self, event: &str) -> usize {
         self.fanout.send(Event::default().data(event)).unwrap_or(0)
     }
