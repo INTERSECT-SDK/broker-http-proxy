@@ -4,10 +4,57 @@ Effectively serves as a way for two message brokers to "share" messages across H
 
 Specific INTERSECT messaging logic has its own module (see `shared-deps/src/intersect_messaging.rs`), so these applications could easily be forked to support another ecosystem with its own messaging protocol.
 
-This repository consists of two applications, neither of which can function without the other:
+This repository consists of two applications:
 
-- `proxy-http-server` - subscribe to message brokers and emit the messages on a SSE endpoint
-- `proxy-http-client` - subscribe to the aforementioned SSE endpoint and publish them to a broker.
+- `proxy-http-server` - subscribe to message brokers and emit the messages on a SSE endpoint, or publish messages on a POST endpoint
+- `proxy-http-client` - subscribe to the aforementioned server SSE endpoint and publish them to a broker, or subscribe to message brokers and publish their messages on the aforementioned POST endpoint.
+
+The server can function as a standalone application, but the client needs to talk to a server application. The general architecture looks something like:
+
+```
+------------
+| BROKER 1 |
+------------
+
+^
+|   AMQP
+v
+
+---------------------
+| proxy-http-server |
+---------------------
+
+^
+|   HTTP
+v
+---------------------- SYSTEM DIVIDING LINE
+^
+|   HTTP
+v
+
+---------------------
+| proxy-http-client |
+---------------------
+
+^
+|   AMQP
+v
+
+------------
+| BROKER 2 |
+------------
+
+```
+
+All applications connected to Broker 1 will share the same system, and all applications connected to Broker 2 will share the same system. Data may flow in either direction.
+
+To prevent infinite loops and to ensure security, subscribers will not broadcast any messages which are determined to not originate from their system.
+
+Caveats:
+- you should only deploy one `proxy-http-client` and one `proxy-http-server` per system at most
+- any other proxies you talk to should have different systems.
+- while you can have a `client` and a `server` application for both systems, you should only have one of the clients talk to the other's server. Don't connect both clients to both servers.
+
 
 Currently only supports AMQP 0-9-1 as the broker protocol but can potentially support others in the future
 
