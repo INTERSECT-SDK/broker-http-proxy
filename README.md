@@ -6,8 +6,8 @@ Specific INTERSECT messaging logic has its own module (see `shared-deps/src/inte
 
 This repository consists of two applications, neither of which can function without the other:
 
-- `broker-2-http` - subscribe to message brokers and emit the messages on a SSE endpoint
-- `http-2-broker` - subscribe to the aforementioned SSE endpoint and publish them to a broker.
+- `proxy-http-server` - subscribe to message brokers and emit the messages on a SSE endpoint
+- `proxy-http-client` - subscribe to the aforementioned SSE endpoint and publish them to a broker.
 
 Currently only supports AMQP 0-9-1 as the broker protocol but can potentially support others in the future
 
@@ -26,14 +26,14 @@ You can format with `cargo fmt` and lint with `cargo clippy` . There's also a pr
 You will need two message brokers and two instances of this application running for it to have any purpose.
 
 1) Spin up backing services: `docker compose up -d` (note that this spins up two brokers, add 1 to all normal port numbers for second broker)
-2) In terminal 1, run broker-2-http: `APP_CONFIG_FILE=broker-2-http/conf.yaml cargo run --bin broker-2-http`
-3) In terminal 2, run http-2-broker (will not work until broker-2-http is initialized): `APP_CONFIG_FILE=http-2-broker/conf.yaml cargo run --bin http-2-broker`
+2) In terminal 1, run proxy-http-server: `APP_CONFIG_FILE=proxy-http-server/conf.yaml cargo run --bin proxy-http-server`
+3) In terminal 2, run proxy-http-client (will not work until proxy-http-server is initialized): `APP_CONFIG_FILE=proxy-http-client/conf.yaml cargo run --bin proxy-http-client`
 
 ## Application Configuration (primarily for DevOps)
 
 Common configuration structures can be found in `shared-deps/src/configuration.rs` . The `get_configuration()` function is what will be called to initialize the configuration logic.
 
-Specific configuration structs are in `broker-2-http/src/configuration.rs` and `http-2-broker/src/configuration.rs` .
+Specific configuration structs are in `proxy-http-server/src/configuration.rs` and `proxy-http-client/src/configuration.rs` .
 
 ## Setup
 
@@ -42,13 +42,13 @@ Specific configuration structs are in `broker-2-http/src/configuration.rs` and `
 These instructions assume you are using the docker compose configuration and the default `conf.yaml` configurations for each.
 
 1) Make sure that you have both applications started (do NOT start more than 1 of each)
-2) Login to localhost:15673, username `intersect_username`, password `intersect_password`, click on `exchanges`, make sure the `intersect-messages` exchange exists (this one gets created by `http-2-broker` on startup).
+2) Login to localhost:15673, username `intersect_username`, password `intersect_password`, click on `exchanges`, make sure the `intersect-messages` exchange exists (this one gets created by `proxy-http-client` on startup).
 3) Go to the `Queues and streams` tab, expand `Add a new queue` section, set `Name` field as whatever you want, other settings are fine, click `Add queue`
 4) Click on the queue you just created, expand `Bindings` section, see `Add binding to queue` section, set `From exchange` to equal `intersect-messages`, set `Routing key` to be `organization.facility.system.subsystem.service.userspace` , click `Bind queue`
 
 (TODO - should probably configure HTTP2BROKER and INTERSECT-SDK Publishers to create a temporary durable queue so that there's always a queue available to consume the message. Then we can skip steps 2/3/4. Note that you can probably skip these steps anyways in production IF you always deploy your Services before executing any Clients, but if Clients execute before Services you may end up losing a message)
 
-5) Login to localhost:15672, username `intersect_username`, password `intersect_password`, click on `exchanges`, check the `intersect-messages` exchange (this one gets created by `broker-2-http` on startup), expand the `Publish message` section, set routing key to `organization.facility.system.subsystem.service.userspace` (this parallels how the SDK constructs these routing keys)
+5) Login to localhost:15672, username `intersect_username`, password `intersect_password`, click on `exchanges`, check the `intersect-messages` exchange (this one gets created by `proxy-http-server` on startup), expand the `Publish message` section, set routing key to `organization.facility.system.subsystem.service.userspace` (this parallels how the SDK constructs these routing keys)
 6) Set payload to below:
 
 ```
@@ -57,7 +57,7 @@ These instructions assume you are using the docker compose configuration and the
 
 (This closely replicates what an INTERSECT message looks like, though the only thing you really need to check is that your conf.yaml's `topic_prefix` value starts with the value for `headers.source`)
 
-7) Click "publish_message". At this point the message should show up in the logs for both `http-2-broker` and `broker-2-http` .
+7) Click "publish_message". At this point the message should show up in the logs for both `proxy-http-client` and `proxy-http-server` .
 8) On localhost:15673 `Queues and streams` section, blow up `Get messages`, set Ack mode to `Automatic ack`, click on `Get messages`, you should see your payload from step 6.
 
 Congratulations, you have successfully simulated a publisher and a subscriber being able to talk to each other across 2 separate message brokers.

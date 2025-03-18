@@ -23,7 +23,7 @@ pub struct IntersectMessageHeaders {
     source: String,
 }
 
-/// we only use this for broker-2-http - only emit messages from our system through SSE
+/// we only use this for proxy-http-server - only emit messages from our system through SSE
 /// If Result.Error - JSON serialization failure, so do not send it through
 /// If Result.OK - JSON serialization success, wrapped boolean determines whether or not to send it through
 pub fn should_message_passthrough(

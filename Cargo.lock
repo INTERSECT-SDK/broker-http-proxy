@@ -274,32 +274,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "broker-2-http"
-version = "0.1.0"
-dependencies = [
- "amqprs",
- "anyhow",
- "async-stream",
- "axum",
- "axum-extra",
- "config",
- "deadpool-amqprs",
- "futures",
- "intersect-ingress-proxy-common",
- "secrecy",
- "serde",
- "serde-aux",
- "serde_json",
- "tokio",
- "tokio-stream",
- "tower",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
 name = "bumpalo"
 version = "3.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -744,29 +718,6 @@ dependencies = [
  "bytes",
  "fnv",
  "itoa",
-]
-
-[[package]]
-name = "http-2-broker"
-version = "0.1.0"
-dependencies = [
- "amqprs",
- "anyhow",
- "async-stream",
- "config",
- "deadpool-amqprs",
- "futures",
- "intersect-ingress-proxy-common",
- "reqwest",
- "reqwest-eventsource",
- "secrecy",
- "serde",
- "serde-aux",
- "serde_json",
- "tokio",
- "tokio-stream",
- "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -1389,6 +1340,55 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60946a68e5f9d28b0dc1c21bb8a97ee7d018a8b322fa57838ba31cc878e22d99"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "proxy-http-client"
+version = "0.1.0"
+dependencies = [
+ "amqprs",
+ "anyhow",
+ "async-stream",
+ "config",
+ "deadpool-amqprs",
+ "futures",
+ "intersect-ingress-proxy-common",
+ "reqwest",
+ "reqwest-eventsource",
+ "secrecy",
+ "serde",
+ "serde-aux",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "proxy-http-server"
+version = "0.1.0"
+dependencies = [
+ "amqprs",
+ "anyhow",
+ "async-stream",
+ "axum",
+ "axum-extra",
+ "config",
+ "deadpool-amqprs",
+ "futures",
+ "intersect-ingress-proxy-common",
+ "secrecy",
+ "serde",
+ "serde-aux",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]

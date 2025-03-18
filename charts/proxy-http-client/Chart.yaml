@@ -1,5 +1,5 @@
 apiVersion: v2
-name: http-2-broker
+name: proxy-http-client
 description: "Subscribe to events over HTTP and publish them on a local broker"
 version: 0.1.0
 dependencies:

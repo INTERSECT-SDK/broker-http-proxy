@@ -9,7 +9,9 @@ use intersect_ingress_proxy_common::telemetry::{
     get_json_subscriber, get_pretty_subscriber, init_subscriber,
 };
 
-use broker_2_http::{broadcaster::Broadcaster, configuration::Settings, webapp::WebApplication};
+use proxy_http_server::{
+    broadcaster::Broadcaster, configuration::Settings, webapp::WebApplication,
+};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -18,7 +20,7 @@ async fn main() -> anyhow::Result<()> {
     // Start logging
     if configuration.production {
         let subscriber = get_json_subscriber(
-            "broker-2-http".into(),
+            "proxy-http-server".into(),
             configuration.log_level.to_string(),
             std::io::stderr,
         );
