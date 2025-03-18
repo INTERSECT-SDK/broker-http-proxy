@@ -11,6 +11,9 @@ use tower_http::{
 };
 use tracing::Level;
 
+use intersect_ingress_proxy_common::server_paths::{PUBLISH_URL, SUBSCRIBE_URL};
+use intersect_ingress_proxy_common::signals::wait_for_os_signal;
+
 use crate::{
     broadcaster::Broadcaster,
     configuration::Settings,
@@ -19,9 +22,6 @@ use crate::{
         subscribe::sse_handler,
     },
 };
-
-use intersect_ingress_proxy_common::server_paths::{PUBLISH_URL, SUBSCRIBE_URL};
-use intersect_ingress_proxy_common::signals::wait_for_os_signal;
 
 /// This is state that can be accessed by any endpoint on the server.
 pub struct WebApplicationState {

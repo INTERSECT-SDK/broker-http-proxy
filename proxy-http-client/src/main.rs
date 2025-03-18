@@ -1,116 +1,18 @@
 use std::sync::Arc;
 
-use deadpool_amqprs::Pool;
-use futures::StreamExt;
-use proxy_http_client::poster::Poster;
-use reqwest_eventsource::{Event, EventSource};
-use secrecy::ExposeSecret;
 use tokio::sync::oneshot;
 
 use intersect_ingress_proxy_common::configuration::get_configuration;
-use intersect_ingress_proxy_common::intersect_messaging::extract_eventsource_data;
 use intersect_ingress_proxy_common::protocols::amqp::{
-    get_channel, get_connection_pool, is_routing_key_compliant, publish::amqp_publish_message,
-    subscribe::broker_consumer_loop, verify_connection_pool,
+    get_connection_pool, subscribe::broker_consumer_loop, verify_connection_pool,
 };
-use intersect_ingress_proxy_common::server_paths::SUBSCRIBE_URL;
-use intersect_ingress_proxy_common::signals::wait_for_os_signal;
 use intersect_ingress_proxy_common::telemetry::{
     get_json_subscriber, get_pretty_subscriber, init_subscriber,
 };
-use proxy_http_client::configuration::Settings;
 
-/// Return Err only if we weren't able to publish a correct message to the broker, invalid messages are ignored
-async fn send_message(message: String, connection_pool: Pool) -> Result<(), String> {
-    let es_data_result = extract_eventsource_data(&message);
-    if es_data_result.is_err() {
-        return Ok(());
-    }
-    let (topic, data) = es_data_result.unwrap();
-    if !is_routing_key_compliant(&topic) {
-        tracing::warn!(
-            "{} is not a valid AMQP topic name, will not attempt publish",
-            topic
-        );
-        return Ok(());
-    }
-    tracing::debug!("Publishing message with topic: {}", &topic);
+use proxy_http_client::{configuration::Settings, event_source::event_source_loop, poster::Poster};
 
-    let connection = connection_pool.get().await.map_err(|_| {
-        "WARNING: Couldn't get connection, message received from other proxy was NOT published on our own broker."
-            .to_string()
-    })?;
-
-    let channel = get_channel(&connection).await.map_err(|_| {
-        "WARNING: Couldn't get channel, message received from other proxy was NOT published on our own broker."
-            .to_string()
-    })?;
-
-    match amqp_publish_message(channel, &topic, data).await {
-        Ok(_) => Ok(()),
-        Err(_) => Err(
-            "WARNING: message received from other proxy was NOT published on our own broker."
-                .into(),
-        ),
-    }
-}
-
-/// Return value - exit code to use
-async fn event_source_loop(configuration: &Settings, connection_pool: Pool) -> i32 {
-    let mut es = EventSource::new(
-        reqwest::Client::new()
-            .get(format!(
-                "{}{}",
-                &configuration.other_proxy.url, SUBSCRIBE_URL
-            ))
-            .basic_auth(
-                &configuration.other_proxy.username,
-                Some(configuration.other_proxy.password.expose_secret()),
-            ),
-    )
-    .unwrap();
-    let mut rc = 0;
-    loop {
-        tokio::select! {
-            // got data back from web server
-            evt = es.next() => {
-                match evt {
-                    None => {
-                        // probably isn't reachable
-                        tracing::error!("couldn't get next event");
-                        rc = 1;
-                        break;
-                    },
-                    Some(event) => {
-                        match event {
-                            Ok(Event::Open) => {
-                                tracing::info!("connected to {}", &configuration.other_proxy.url);
-                            },
-                            Ok(Event::Message(message)) => {
-                                if let Err(e) = send_message(message.data, connection_pool.clone()).await {
-                                    tracing::error!(e);
-                                };
-                            },
-                            Err(err) => {
-                                // will happen if we can't connect to the endpoint OR if the endpoint drops us
-                                tracing::error!(error = ?err, "Event source error --- {}", err);
-                                rc = 1;
-                                break;
-                            },
-                        }
-                    },
-                }
-            },
-            // OS kill signal
-            _ = wait_for_os_signal() => {
-                break;
-            },
-        };
-    }
-    es.close();
-
-    rc
-}
+const APPLICATION_NAME: &str = "proxy-http-client";
 
 #[tokio::main]
 pub async fn main() -> anyhow::Result<()> {
@@ -119,7 +21,7 @@ pub async fn main() -> anyhow::Result<()> {
     // Start logging
     if configuration.production {
         let subscriber = get_json_subscriber(
-            "proxy-http-client".into(),
+            APPLICATION_NAME.into(),
             configuration.log_level.to_string(),
             std::io::stderr,
         );
@@ -131,7 +33,7 @@ pub async fn main() -> anyhow::Result<()> {
 
     // set up broker connection pool
     let pool = get_connection_pool(&configuration.broker).await;
-    if let Err(msg) = verify_connection_pool(&pool).await {
+    if let Err(msg) = verify_connection_pool(&pool, APPLICATION_NAME).await {
         tracing::error!(msg);
         std::process::exit(1);
     }
@@ -142,11 +44,12 @@ pub async fn main() -> anyhow::Result<()> {
     // - After the Event Source loop has been shut down (either because we're killing the app or because we got a server error),
     //     drop the sender from memory, which will trigger an rx.recv() command
     // - This allows us to "finish up" publishing a message to our broker before killing the application.
-    let (tx, rx) = oneshot::channel::<()>();
+    let (tx, rx) = oneshot::channel();
 
     let broker_join_handle = broker_consumer_loop(
         pool.clone(),
         configuration.topic_prefix.clone(),
+        APPLICATION_NAME.into(),
         Arc::new(Poster::new(&configuration.other_proxy)),
         rx,
     );
