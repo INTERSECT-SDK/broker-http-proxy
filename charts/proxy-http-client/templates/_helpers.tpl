@@ -32,10 +32,3 @@ Ref: https://cert-manager.io/docs/usage/ingress/#supported-annotations
     {{- true -}}
 {{- end -}}
 {{- end -}}
-
-{{/*
-Return Neo4J dependency chart name
-*/}}
-{{- define "intersect-proxy-http-client.neo4j.fullname" -}}
-{{ include "common.names.dependency.fullname" (dict "chartName" "neo4j" "chartValues" .Values.neo4j "context" $) }}
-{{- end -}}
