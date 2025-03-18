@@ -159,22 +159,26 @@ async fn consume_message(
                 }
                 Ok(true) => {
                     let topic = deliver.routing_key();
-                    let event = make_eventsource_data(topic, &utf8_data);
-                    tracing::debug!("consume delivery {} , data: {}", deliver, event,);
-                    // TODO handle this better later, see broadcast() documentation for details.
-                    tokio::select! {
-                        _ = killswitch => {
-                            // WARNING: in the client implementation, this may happen while waiting on a response, resulting in us rejecting a message we actually passed through successfully
-                            // this would only happen if we actually call publish_event_to_http(), if the killswitch was toggled before reaching here we will always do the killswitch branch.
-                            tracing::warn!("Got message from broker but did not send it over HTTP, the message will be rejected.");
-                            should_ack = false;
-                        },
-                        http_result = broadcaster.publish_event_to_http(event) => {
-                            if !http_result {
-                                tracing::warn!("Some clients may not have gotten a message, the message will be rejected.");
-                                should_ack = false;
+                    match make_eventsource_data(topic, &utf8_data) {
+                        Err(_) => {}
+                        Ok(event) => {
+                            tracing::debug!("consume delivery {} , data: {}", deliver, event,);
+                            // TODO handle this better later, see broadcast() documentation for details.
+                            tokio::select! {
+                                _ = killswitch => {
+                                    // WARNING: in the client implementation, this may happen while waiting on a response, resulting in us rejecting a message we actually passed through successfully
+                                    // this would only happen if we actually call publish_event_to_http(), if the killswitch was toggled before reaching here we will always do the killswitch branch.
+                                    tracing::warn!("Got message from broker but did not send it over HTTP, the message will be rejected.");
+                                    should_ack = false;
+                                },
+                                http_result = broadcaster.publish_event_to_http(event) => {
+                                    if !http_result {
+                                        tracing::warn!("Some clients may not have gotten a message, the message will be rejected.");
+                                        should_ack = false;
+                                    }
+                                },
                             }
-                        },
+                        }
                     }
                 }
             }

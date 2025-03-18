@@ -38,29 +38,50 @@ pub fn should_message_passthrough(
 // The values are just the channel concatenated with the message string, separated by a non-printable byte (1)
 // since channels always follow a specific format, but messages can have many arbitrary characters in them, list the channel first.
 
-/// build the event source data string
-pub fn make_eventsource_data(channel: &str, msg_str: &str) -> String {
-    format!("{}{}{}", channel, DELIMITER, msg_str)
-}
-
 #[derive(Debug)]
-pub struct ExtractEventSourceErr;
+pub struct IntersectEventSourceErr;
 
-impl std::fmt::Display for ExtractEventSourceErr {
+impl std::fmt::Display for IntersectEventSourceErr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "event source data was not properly formatted")
     }
 }
 
-impl std::error::Error for ExtractEventSourceErr {}
+impl std::error::Error for IntersectEventSourceErr {}
+
+fn contains_control_characters(channel: &str, msg_str: &str) -> bool {
+    channel.as_bytes().iter().any(|byte| *byte < b' ')
+        || msg_str.as_bytes().iter().any(|byte| *byte < b' ')
+}
+
+/// build the event source data string
+pub fn make_eventsource_data(
+    channel: &str,
+    msg_str: &str,
+) -> Result<String, IntersectEventSourceErr> {
+    // TODO rework this when we switch to strictly binary characters
+    if contains_control_characters(channel, msg_str) {
+        tracing::warn!("Data from SSE should not have any control characters");
+        return Err(IntersectEventSourceErr);
+    }
+    Ok(format!("{}{}{}", channel, DELIMITER, msg_str))
+}
 
 /// returns a tuple of the channel string and the event source string
-pub fn extract_eventsource_data(data: &str) -> Result<(String, String), ExtractEventSourceErr> {
+pub fn extract_eventsource_data(data: &str) -> Result<(String, String), IntersectEventSourceErr> {
     match data.split_once(DELIMITER) {
-        Some((channel, msg_str)) => Ok((channel.to_owned(), msg_str.to_owned())),
+        Some((channel, msg_str)) => {
+            // TODO rework this when we switch to strictly binary payloads
+            // we technically could allow for control characters which aren't '\n' or '\r', but it's best to prohibit this
+            if contains_control_characters(channel, msg_str) {
+                tracing::warn!("Data from SSE should not have any control characters");
+                return Err(IntersectEventSourceErr);
+            }
+            Ok((channel.to_owned(), msg_str.to_owned()))
+        }
         None => {
             tracing::warn!("Data from SSE does not match expected format: {}", data);
-            Err(ExtractEventSourceErr)
+            Err(IntersectEventSourceErr)
         }
     }
 }
@@ -104,14 +125,46 @@ mod tests {
     #[test]
     fn encode_decode_eventsource_msg_idempotent() {
         let channel = "channel";
-        let message = "mess\x01age\x01"; // message also uses delimiter but can still be restored exactly as-is
+        let message = "message";
 
-        let encoded = make_eventsource_data(channel, message);
+        let encoded = make_eventsource_data(channel, message).unwrap();
         // our delimiter only adds one byte to all the data we want to push through
         assert!(encoded.len() == channel.len() + message.len() + 1);
 
         let (decoded_channel, decoded_message) = extract_eventsource_data(&encoded).unwrap();
         assert_eq!(channel, decoded_channel);
         assert_eq!(message, decoded_message);
+    }
+
+    #[test]
+    fn disallow_control_characters_in_eventsource_parts() {
+        let channel = "channel\n";
+        let msg_str = "message";
+        let result = make_eventsource_data(channel, msg_str);
+        assert!(result.is_err());
+
+        let channel = "channel";
+        let msg_str = "message\n";
+        let result = make_eventsource_data(channel, msg_str);
+        assert!(result.is_err());
+
+        let channel = "channel";
+        let msg_str = "message";
+        let result = make_eventsource_data(channel, msg_str);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn disallow_control_characters_in_eventsource() {
+        let encoded = "channel\x01message\n";
+        let result = extract_eventsource_data(&encoded);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn require_delimiter_in_eventsource() {
+        let encoded = "channelmessage";
+        let result = extract_eventsource_data(&encoded);
+        assert!(result.is_err());
     }
 }
