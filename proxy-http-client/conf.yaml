@@ -1,6 +1,6 @@
 # local development config file for the HTTP client
 other_proxy:
-  url: "http://localhost:8080"  # do not include the trailing "/" or any part of the path
+  url: "http://localhost:8080/"  # do not include the path, trailing slash is optional
   username: dummy_username
   password: dummy_password
 broker:
@@ -10,7 +10,6 @@ broker:
   # note: differs from other config file (two separate brokers used)
   port: 5673
 # use amqp topic notation, note that the system is different from the other configuration
-# TODO: current implementation requires this to end with a "." character, this should be fixed...
-topic_prefix: "organization.facility.system2."  # CHANGE THIS PER DEPLOYMENT!!!
+topic_prefix: "organization.facility.system2"  # CHANGE THIS PER DEPLOYMENT!!!
 log_level: "debug"
 production: false

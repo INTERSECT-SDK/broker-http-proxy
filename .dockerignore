@@ -1,5 +1,7 @@
-/target
-*.tmp
-*.log
-Dockerfile
-.dockerignore
+*
+!proxy-http-client
+!proxy-http-server
+!shared-deps
+!Cargo.lock
+!Cargo.toml
+!rust-toolchain.toml

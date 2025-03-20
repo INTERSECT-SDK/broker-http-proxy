@@ -7,7 +7,9 @@
 use secrecy::SecretString;
 use serde_aux::field_attributes::deserialize_number_from_string;
 
-use intersect_ingress_proxy_common::configuration::{BrokerSettings, LogLevel};
+use intersect_ingress_proxy_common::configuration::{
+    deserialize_enforce_topic_prefixes, BrokerSettings, LogLevel,
+};
 
 #[derive(serde::Deserialize, Clone)]
 pub struct Settings {
@@ -18,6 +20,7 @@ pub struct Settings {
     pub app_port: u16,
     /// log level of the entire application
     pub log_level: LogLevel,
+    #[serde(deserialize_with = "deserialize_enforce_topic_prefixes")]
     /// this should only contain the SYSTEM prefix, i.e. "organization.facility.system."
     pub topic_prefix: String,
     /// username for Basic Authentication

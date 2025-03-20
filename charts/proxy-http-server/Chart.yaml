@@ -1,7 +1,7 @@
 apiVersion: v2
 name: proxy-http-server
 description: "Subscribe to broker messages and broadcast them to HTTP listeners"
-version: 0.1.0
+version: 0.1.1
 dependencies:
   - name: common
     repository: oci://registry-1.docker.io/bitnamicharts

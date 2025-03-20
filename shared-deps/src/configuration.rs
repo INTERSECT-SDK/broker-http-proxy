@@ -4,6 +4,7 @@
 use std::{fmt::Display, str::FromStr};
 
 use secrecy::SecretString;
+use serde::{de::Error as deError, Deserialize, Deserializer};
 use serde_aux::field_attributes::deserialize_number_from_string;
 
 #[derive(serde::Deserialize, Clone, Debug)]
@@ -52,6 +53,67 @@ impl Display for LogLevel {
             LogLevel::Info => f.write_str("info"),
             LogLevel::Trace => f.write_str("trace"),
         }
+    }
+}
+
+/// when deserializing, strip out any trailing slashes from the end (useful for URLs)
+pub fn deserialize_trim_trailing_slash<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let mut base: String = Deserialize::deserialize(deserializer)?;
+    if base.ends_with("/") {
+        base.pop();
+    }
+    Ok(base)
+}
+
+/// custom deserializer which enforces and normalizes system names
+pub fn deserialize_enforce_topic_prefixes<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let mut base: String = Deserialize::deserialize(deserializer)?;
+
+    // TODO will need to update this logic later, when we reduce the namespacing as part of a new INTERSECT release
+    let mut period_count = 0_u16;
+    for character in base.chars() {
+        if character == '-' || character.is_ascii_digit() || character.is_ascii_lowercase() {
+            continue;
+        } else if character == '.' {
+            period_count += 1;
+        } else {
+            return Err(deError::custom(format!(
+                "topic_prefix: Invalid character detected: {}",
+                character
+            )));
+        }
+    }
+
+    match period_count {
+        2 => {
+            if base.ends_with(".") {
+                Err(deError::custom(
+                    "topic_prefix: 3 levels of namespacing expected but only 2 provided",
+                ))
+            } else {
+                base += ".";
+                Ok(base)
+            }
+        }
+        3 => {
+            if base.ends_with(".") {
+                Ok(base)
+            } else {
+                Err(deError::custom(
+                    "topic_prefix: 3 levels of namespacing expected but 4 provided",
+                ))
+            }
+        }
+        c => Err(deError::custom(format!(
+            "topic_prefix: Too many periods ({})",
+            c
+        ))),
     }
 }
 

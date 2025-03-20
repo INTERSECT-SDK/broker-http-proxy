@@ -6,10 +6,13 @@
 /// 5) Additional logic can be found in shared-deps/src/configuration.rs
 use secrecy::SecretString;
 
-use intersect_ingress_proxy_common::configuration::{BrokerSettings, LogLevel};
+use intersect_ingress_proxy_common::configuration::{
+    deserialize_enforce_topic_prefixes, deserialize_trim_trailing_slash, BrokerSettings, LogLevel,
+};
 
 #[derive(serde::Deserialize, Clone, Debug)]
 pub struct ExternalProxy {
+    #[serde(deserialize_with = "deserialize_trim_trailing_slash")]
     /// URL for the other ingress proxy we are communicating with
     pub url: String,
     /// Basic authentication credentials for the other proxy
@@ -28,6 +31,7 @@ pub struct Settings {
     pub log_level: LogLevel,
     /// set to true for developer-unfriendly settings (currently just log formats)
     pub production: bool,
+    #[serde(deserialize_with = "deserialize_enforce_topic_prefixes")]
     /// this should only contain the SYSTEM prefix, i.e. "organization.facility.system."
     pub topic_prefix: String,
 }

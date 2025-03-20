@@ -128,9 +128,9 @@ serviceAccount:
 
 app:
   log_level: "info"
-  topic_prefix: "" # i.e. "organization.facility.system.", you should consciously set this value. It MUST end with a "."
+  topic_prefix: "" # i.e. "organization.facility.system.", you should consciously set this value.
   other_proxy:
-    url: "" # this should not include the path or a trailing slash
+    url: "" # this should not include the path
     username: "" # needed credential for clients calling HTTP endpoints other than /healthcheck
     password: "" # needed credential for clients calling HTTP endpoints other than /healthcheck
   broker:
