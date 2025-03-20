@@ -1,6 +1,6 @@
 apiVersion: v2
 name: proxy-http-client
-description: "Subscribe to events over HTTP and publish them on a local broker"
+description: "Subscribe to events over HTTP from a proxy-http-server instance, and publish them on a local broker"
 version: 0.1.0
 dependencies:
   - name: common
