@@ -32,7 +32,7 @@ pub async fn main() -> anyhow::Result<()> {
     }
 
     // set up broker connection pool
-    let pool = get_connection_pool(&configuration.broker).await;
+    let pool = get_connection_pool(&configuration.broker);
     if let Err(msg) = verify_connection_pool(&pool, APPLICATION_NAME).await {
         tracing::error!(msg);
         std::process::exit(1);
@@ -54,8 +54,11 @@ pub async fn main() -> anyhow::Result<()> {
         rx,
     );
 
+    let other_proxy = configuration.other_proxy.clone();
+    drop(configuration);
+
     // this will run until we get an event source error or we catch an OS signal
-    let rc = event_source_loop(&configuration, pool.clone()).await;
+    let rc = event_source_loop(other_proxy, pool).await;
 
     tracing::info!("Attempting graceful shutdown: No longer listening for events over HTTP");
     drop(tx);

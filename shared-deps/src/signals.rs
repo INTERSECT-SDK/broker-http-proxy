@@ -1,4 +1,5 @@
 // full credit to this module goes to https://github.com/Finomnis/tokio-graceful-shutdown/blob/43684d80cc5afbe49c87fbc3f8404dce0fc01144/src/signal_handling.rs
+// with the additions of catching SIGQUIT and SIGHUP on Unix systems.
 
 /// Waits for a signal that requests a graceful shutdown, like SIGTERM or SIGINT.
 #[cfg(unix)]
@@ -9,10 +10,14 @@ async fn wait_for_os_signal_impl() {
     // https://www.gnu.org/software/libc/manual/html_node/Termination-Signals.html
     let mut signal_terminate = signal(SignalKind::terminate()).unwrap();
     let mut signal_interrupt = signal(SignalKind::interrupt()).unwrap();
+    let mut signal_quit = signal(SignalKind::quit()).unwrap();
+    let mut signal_hangup = signal(SignalKind::hangup()).unwrap();
 
     tokio::select! {
         _ = signal_terminate.recv() => tracing::debug!("Received SIGTERM."),
         _ = signal_interrupt.recv() => tracing::debug!("Received SIGINT."),
+        _ = signal_quit.recv() => tracing::debug!("Received SIGQUIT."),
+        _ = signal_hangup.recv() => tracing::debug!("Received SIGHUP."),
     };
 }
 
@@ -39,5 +44,5 @@ async fn wait_for_os_signal_impl() {
 /// Registers signal handlers and waits for a signal that
 /// indicates a shutdown request.
 pub async fn wait_for_os_signal() {
-    wait_for_os_signal_impl().await
+    wait_for_os_signal_impl().await;
 }

@@ -16,6 +16,11 @@ use intersect_ingress_proxy_common::protocols::amqp::{
 use crate::webapp::WebApplicationState;
 
 /// HTTP POST endpoint which will publish a message meeting the INTERSECT specification
+///
+/// # Errors
+///   - Sends back a 401 if authentication is incorrect
+///   - Sends back a 400 if the message body is improperly formatted
+///   - Sends back a 500 if the server was unable to send the message
 pub async fn publish_message(
     State(app_state): State<Arc<WebApplicationState>>,
     TypedHeader(authorization): TypedHeader<Authorization<Basic>>,
@@ -50,7 +55,7 @@ pub async fn publish_message(
         );
         return Err((
             StatusCode::BAD_REQUEST,
-            format!("{} is not a valid AMQP topic name", topic),
+            format!("{topic} is not a valid AMQP topic name"),
         ));
     }
     tracing::debug!("Publishing message with topic: {}", &topic);
@@ -72,7 +77,7 @@ pub async fn publish_message(
     })?;
     amqp_publish_message(channel, &topic, data)
         .await
-        .map_err(|_| {
+        .map_err(|()| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "server fault, message not published".to_string(),

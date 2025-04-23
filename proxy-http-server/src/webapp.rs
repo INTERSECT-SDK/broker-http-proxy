@@ -42,6 +42,9 @@ pub struct WebApplication {
 }
 
 impl WebApplication {
+    ///
+    /// # Errors
+    ///   - errors if unable to bind to provided TCP port
     pub async fn build(
         configuration: &Settings,
         broadcaster: Arc<Broadcaster>,
@@ -57,8 +60,8 @@ impl WebApplication {
             configuration.app_port
         );
         let listener = TcpListener::bind(address).await?;
-        let port = listener.local_addr().unwrap().port();
-        let server = run(listener, configuration, broadcaster, amqp_pool).await?;
+        let port = listener.local_addr()?.port();
+        let server = create_axum(listener, configuration, broadcaster, amqp_pool);
 
         tracing::info!("Web server is running on port {}", port);
 
@@ -69,6 +72,9 @@ impl WebApplication {
         self.port
     }
 
+    ///
+    /// # Errors
+    ///   - Errors if unable to initialize web server
     pub async fn run_until_stopped(self) -> Result<(), std::io::Error> {
         // the return type of "with_graceful_shutdown" is unstable, so set it up here
         self.server
@@ -77,12 +83,12 @@ impl WebApplication {
     }
 }
 
-async fn run(
+fn create_axum(
     listener: TcpListener,
     configuration: &Settings,
     broadcaster: Arc<Broadcaster>,
     amqp_pool: Pool,
-) -> Result<WebAppServer, anyhow::Error> {
+) -> WebAppServer {
     let middleware = ServiceBuilder::new()
         .set_x_request_id(MakeRequestUuid)
         .layer(
@@ -111,6 +117,5 @@ async fn run(
         .route("/healthcheck", get(health_check))
         .fallback(handler_404);
 
-    let server = axum::serve(listener, app);
-    Ok(server)
+    axum::serve(listener, app)
 }

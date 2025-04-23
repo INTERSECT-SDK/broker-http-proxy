@@ -1,6 +1,6 @@
 /// FOR DEVOPS USERS:
 /// This file represents common configuration structures used across both applications.
-/// Implementation details are in the "get_configuration" function.
+/// Implementation details are in the `get_configuration` function.
 use std::{fmt::Display, str::FromStr};
 
 use secrecy::SecretString;
@@ -20,7 +20,7 @@ pub struct BrokerSettings {
     pub host: String,
 }
 
-#[derive(serde::Deserialize, Clone)]
+#[derive(serde::Deserialize, Clone, Debug)]
 pub enum LogLevel {
     Trace,
     Debug,
@@ -57,18 +57,24 @@ impl Display for LogLevel {
 }
 
 /// when deserializing, strip out any trailing slashes from the end (useful for URLs)
+///
+/// # Errors
+///   - Deserialization error: if the value can't be deserialized (should generally be unreachable unless value is not valid UTF-8)
 pub fn deserialize_trim_trailing_slash<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
     D: Deserializer<'de>,
 {
     let mut base: String = Deserialize::deserialize(deserializer)?;
-    if base.ends_with("/") {
+    if base.ends_with('/') {
         base.pop();
     }
     Ok(base)
 }
 
 /// custom deserializer which enforces and normalizes system names
+///
+/// # Errors
+///   - Deserialization error: if the value can't be deserialized (only if value is not valid UTF-8) or if the value does not represent a valid INTERSECT namespace
 pub fn deserialize_enforce_topic_prefixes<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
     D: Deserializer<'de>,
@@ -80,19 +86,20 @@ where
     for character in base.chars() {
         if character == '-' || character.is_ascii_digit() || character.is_ascii_lowercase() {
             continue;
-        } else if character == '.' {
+        }
+
+        if character == '.' {
             period_count += 1;
         } else {
             return Err(deError::custom(format!(
-                "topic_prefix: Invalid character detected: {}",
-                character
+                "topic_prefix: Invalid character detected: {character}",
             )));
         }
     }
 
     match period_count {
         2 => {
-            if base.ends_with(".") {
+            if base.ends_with('.') {
                 Err(deError::custom(
                     "topic_prefix: 3 levels of namespacing expected but only 2 provided",
                 ))
@@ -102,7 +109,7 @@ where
             }
         }
         3 => {
-            if base.ends_with(".") {
+            if base.ends_with('.') {
                 Ok(base)
             } else {
                 Err(deError::custom(
@@ -111,8 +118,7 @@ where
             }
         }
         c => Err(deError::custom(format!(
-            "topic_prefix: Too many periods ({})",
-            c
+            "topic_prefix: Incorrect number of namespaces ({c}), there should be 3",
         ))),
     }
 }
@@ -121,10 +127,13 @@ where
 ///
 /// Rules:
 /// - highest priority comes from environment variables
-/// - lowest priority comes from values in the YAML config file (path determined in APP_CONFIG_FILE environment variable)
-/// - environment variables can be set for nested structs, i.e. 'Settings.broker.port' is set by 'PROXYAPP_BROKER__PORT=5001' . Two underscores separate struct values.
+/// - lowest priority comes from values in the YAML config file (path determined in `APP_CONFIG_FILE` environment variable)
+/// - environment variables can be set for nested structs, i.e. `Settings.broker.port` is set by `PROXYAPP_BROKER__PORT=5001` . Two underscores separate struct values.
 /// - while you are not required to provide a single source of configuration and can mix them as you want, note that failure to provide a config value
 ///   will cause the application to exit with a non-zero code.
+///
+/// # Errors
+///   - Errors if we can't construct the environment from both a config file and environment variables.
 pub fn get_configuration<'de, T: serde::Deserialize<'de>>() -> Result<T, config::ConfigError> {
     let file_config = match std::env::var("APP_CONFIG_FILE") {
         Ok(config_file_path) => config::Config::builder()

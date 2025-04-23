@@ -10,10 +10,10 @@ use intersect_ingress_proxy_common::protocols::amqp::{
 use intersect_ingress_proxy_common::server_paths::SUBSCRIBE_URL;
 use intersect_ingress_proxy_common::signals::wait_for_os_signal;
 
-use crate::configuration::Settings;
+use crate::configuration::ExternalProxy;
 
 /// Return Err only if we weren't able to publish a correct message to the broker, invalid messages are ignored
-async fn send_message(message: String, connection_pool: Pool) -> Result<(), String> {
+async fn send_message(message: String, connection_pool: &Pool) -> Result<(), String> {
     let es_data_result = extract_eventsource_data(&message);
     if es_data_result.is_err() {
         return Ok(());
@@ -39,8 +39,8 @@ async fn send_message(message: String, connection_pool: Pool) -> Result<(), Stri
     })?;
 
     match amqp_publish_message(channel, &topic, data).await {
-        Ok(_) => Ok(()),
-        Err(_) => Err(
+        Ok(()) => Ok(()),
+        Err(()) => Err(
             "WARNING: message received from other proxy was NOT published on our own broker."
                 .into(),
         ),
@@ -48,19 +48,19 @@ async fn send_message(message: String, connection_pool: Pool) -> Result<(), Stri
 }
 
 /// Return value - exit code to use
-pub async fn event_source_loop(configuration: &Settings, connection_pool: Pool) -> i32 {
+///
+/// # Panics
+///   - Inner API could potentially panic but is currently not expected to do so
+pub async fn event_source_loop(other_proxy: ExternalProxy, connection_pool: Pool) -> i32 {
     let mut es = EventSource::new(
         reqwest::Client::new()
-            .get(format!(
-                "{}{}",
-                &configuration.other_proxy.url, SUBSCRIBE_URL
-            ))
+            .get(format!("{}{}", &other_proxy.url, SUBSCRIBE_URL))
             .basic_auth(
-                &configuration.other_proxy.username,
-                Some(configuration.other_proxy.password.expose_secret()),
+                &other_proxy.username,
+                Some(&other_proxy.password.expose_secret()),
             ),
     )
-    .unwrap();
+    .expect("The event source request body was somehow a stream?");
     let mut rc = 0;
     loop {
         tokio::select! {
@@ -76,10 +76,10 @@ pub async fn event_source_loop(configuration: &Settings, connection_pool: Pool) 
                     Some(event) => {
                         match event {
                             Ok(Event::Open) => {
-                                tracing::info!("connected to {}", &configuration.other_proxy.url);
+                                tracing::info!("connected to {}", &other_proxy.url);
                             },
                             Ok(Event::Message(message)) => {
-                                if let Err(e) = send_message(message.data, connection_pool.clone()).await {
+                                if let Err(e) = send_message(message.data, &connection_pool).await {
                                     tracing::error!(e);
                                 };
                             },
@@ -94,7 +94,7 @@ pub async fn event_source_loop(configuration: &Settings, connection_pool: Pool) 
                 }
             },
             // OS kill signal
-            _ = wait_for_os_signal() => {
+            () = wait_for_os_signal() => {
                 break;
             },
         };

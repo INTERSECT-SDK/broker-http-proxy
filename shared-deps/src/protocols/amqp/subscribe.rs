@@ -36,7 +36,7 @@ pub fn broker_consumer_loop(
             broadcaster,
             killswitch,
         )
-        .await
+        .await;
     })
 }
 
@@ -62,7 +62,7 @@ async fn broker_consumer_loop_inner(
                     tracing::warn!("Shutting down while attempting to reconnect to broker");
                     break;
                 },
-                _ = &mut retry_wait => {
+                () = &mut retry_wait => {
                     continue;
                 },
             }
@@ -88,18 +88,18 @@ async fn broker_consumer_loop_inner(
             .manual_ack(true) // only ack messages we should actually publish, we will nack the others
             .finish();
 
-        let consume_result = channel.basic_consume_rx(args).await;
-        if consume_result.is_err() {
+        let basic_consume_rx = channel.basic_consume_rx(args).await;
+        if basic_consume_rx.is_err() {
             tracing::warn!("Couldn't start consuming, trying again?");
             match channel.close().await {
-                Ok(_) => tracing::debug!("closed channel"),
+                Ok(()) => tracing::debug!("closed channel"),
                 Err(e) => {
-                    tracing::error!(error = ?e, "Could not close channel")
+                    tracing::error!(error = ?e, "Could not close channel");
                 }
             }
             continue;
         }
-        let (consumer_tag, mut messages_rx) = consume_result.unwrap();
+        let (consumer_tag, mut messages_rx) = basic_consume_rx.unwrap();
         loop {
             tokio::select! {
                 _ = &mut killswitch => {
@@ -110,12 +110,11 @@ async fn broker_consumer_loop_inner(
                     break 'connection_loop;
                 },
                 consumer_result = messages_rx.recv() => {
-                    match consumer_result {
-                        Some(msg) => consume_message(msg, &channel, &config_topic, broadcaster.clone(), &mut killswitch).await,
-                        None => {
-                            tracing::warn!("Messages channel was suddenly closed, will try to reconnect");
-                            break;
-                        },
+                    if let Some(msg) = consumer_result {
+                        consume_message(msg, &channel, &config_topic, &broadcaster, &mut killswitch).await;
+                    } else {
+                        tracing::warn!("Messages channel was suddenly closed, will try to reconnect");
+                        break;
                     }
                 }
             }
@@ -131,7 +130,7 @@ async fn consume_message(
     msg: ConsumerMessage,
     channel: &Channel,
     config_topic: &str,
-    broadcaster: Arc<impl HttpBroadcast + Send + Sync + 'static>,
+    broadcaster: &Arc<impl HttpBroadcast + Send + Sync + 'static>,
     killswitch: &mut Receiver<()>,
 ) {
     let deliver = msg.deliver.unwrap();
@@ -193,7 +192,7 @@ async fn consume_message(
         tracing::debug!("ack to delivery {}", deliver);
         let args = BasicAckArguments::new(deliver.delivery_tag(), false);
         match channel.basic_ack(args).await {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(e) => tracing::error!(error = ?e, "manual ack did not work"),
         };
     } else {
@@ -204,7 +203,7 @@ async fn consume_message(
             .basic_reject(BasicRejectArguments::new(deliver.delivery_tag(), true))
             .await
         {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(e) => tracing::error!(error = ?e, "manual reject did not work"),
         };
     }
@@ -217,11 +216,11 @@ async fn cleanup(consumer_tag: String, channel: Channel) {
         .await
     {
         tracing::error!(error = ?e, "could not send cancel message");
-    };
+    }
     match channel.close().await {
-        Ok(_) => tracing::debug!("closed channel"),
+        Ok(()) => tracing::debug!("closed channel"),
         Err(e) => {
-            tracing::error!(error = ?e, "Could not close channel")
+            tracing::error!(error = ?e, "Could not close channel");
         }
     }
 }

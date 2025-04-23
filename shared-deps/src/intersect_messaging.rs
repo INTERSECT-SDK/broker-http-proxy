@@ -13,19 +13,22 @@ pub const INTERSECT_MESSAGE_EXCHANGE: &str = "intersect-messages";
 #[derive(Deserialize)]
 pub struct IntersectMessage {
     // headers: HashMap<String, String>,
-    /// All IntersectMessages have headers, and they are the only property relevant to us.
+    /// All `IntersectMessages` have headers, and they are the only property relevant to us.
     headers: IntersectMessageHeaders,
 }
 
 #[derive(Deserialize)]
 pub struct IntersectMessageHeaders {
-    /// All IntersectMessages have a data source, which is the only property relevant to us.
+    /// All `IntersectMessages` have a data source, which is the only property relevant to us.
     source: String,
 }
 
 /// we only use this for proxy-http-server - only emit messages from our system through SSE
 /// If Result.Error - JSON serialization failure, so do not send it through
 /// If Result.OK - JSON serialization success, wrapped boolean determines whether or not to send it through
+///
+/// # Errors
+///   - Errors if JSON serialization fails
 pub fn should_message_passthrough(
     msg_str: &str,
     this_system: &str,
@@ -55,6 +58,9 @@ fn contains_control_characters(channel: &str, msg_str: &str) -> bool {
 }
 
 /// build the event source data string
+///
+/// # Errors
+///   - Errors if the string contains any control characters
 pub fn make_eventsource_data(
     channel: &str,
     msg_str: &str,
@@ -64,25 +70,25 @@ pub fn make_eventsource_data(
         tracing::warn!("Data from SSE should not have any control characters");
         return Err(IntersectEventSourceErr);
     }
-    Ok(format!("{}{}{}", channel, DELIMITER, msg_str))
+    Ok(format!("{channel}{DELIMITER}{msg_str}"))
 }
 
 /// returns a tuple of the channel string and the event source string
+///
+/// # Errors
+///   - Errors if the message is not in the format <`ORIGINATING_PROXY_SYSTEM`><`DELIMITER`><`MSG`> or if any character other than DELIMITER is a control character
 pub fn extract_eventsource_data(data: &str) -> Result<(String, String), IntersectEventSourceErr> {
-    match data.split_once(DELIMITER) {
-        Some((channel, msg_str)) => {
-            // TODO rework this when we switch to strictly binary payloads
-            // we technically could allow for control characters which aren't '\n' or '\r', but it's best to prohibit this
-            if contains_control_characters(channel, msg_str) {
-                tracing::warn!("Data from SSE should not have any control characters");
-                return Err(IntersectEventSourceErr);
-            }
-            Ok((channel.to_owned(), msg_str.to_owned()))
+    if let Some((channel, msg_str)) = data.split_once(DELIMITER) {
+        // TODO rework this when we switch to strictly binary payloads
+        // we technically could allow for control characters which aren't '\n' or '\r', but it's best to prohibit this
+        if contains_control_characters(channel, msg_str) {
+            tracing::warn!("Data from SSE should not have any control characters");
+            return Err(IntersectEventSourceErr);
         }
-        None => {
-            tracing::warn!("Data from SSE does not match expected format: {}", data);
-            Err(IntersectEventSourceErr)
-        }
+        Ok((channel.to_owned(), msg_str.to_owned()))
+    } else {
+        tracing::warn!("Data from SSE does not match expected format: {}", data);
+        Err(IntersectEventSourceErr)
     }
 }
 

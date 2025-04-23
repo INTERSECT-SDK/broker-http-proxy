@@ -8,6 +8,9 @@ use crate::intersect_messaging::INTERSECT_MESSAGE_EXCHANGE;
 /// publish an INTERSECT message on the broker; if unable to publish, return an error
 ///
 /// this closes and consumes the publishing channel
+///
+/// # Errors
+///  - errors if the message couldn't be published. Note that it does NOT error if it has trouble closing the channel.
 pub async fn amqp_publish_message(channel: Channel, topic: &str, data: String) -> Result<(), ()> {
     let args = BasicPublishArguments::new(INTERSECT_MESSAGE_EXCHANGE, topic);
     tracing::debug!("Preparing to publish message on broker: {}", &data);
@@ -19,17 +22,15 @@ pub async fn amqp_publish_message(channel: Channel, topic: &str, data: String) -
         )
         .await
     {
-        Ok(_) => tracing::debug!("message published successfully"),
+        Ok(()) => tracing::debug!("message published successfully"),
         Err(e) => {
             tracing::error!(error = ?e, "could not publish message");
             return Err(());
         }
-    };
-    match channel.close().await {
-        Ok(_) => {}
-        Err(e) => {
-            tracing::warn!(error = ?e, "could not close channel after publishing message");
-        }
-    };
+    }
+    if let Err(e) = channel.close().await {
+        tracing::warn!(error = ?e, "could not close channel after publishing message");
+    }
+
     Ok(())
 }

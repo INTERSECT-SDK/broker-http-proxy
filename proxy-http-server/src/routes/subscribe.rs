@@ -14,6 +14,7 @@ use std::sync::Arc;
 use crate::webapp::WebApplicationState;
 use intersect_ingress_proxy_common::signals::wait_for_os_signal;
 
+#[allow(clippy::needless_pass_by_value)]
 fn sse_response(
     app_state: Arc<WebApplicationState>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
@@ -23,7 +24,7 @@ fn sse_response(
         loop {
             tokio::select! {
                 // if we catch an OS signal, disconnect the client
-                _ = wait_for_os_signal() => {
+                () = wait_for_os_signal() => {
                     break;
                 },
                 // send the broadcast message to the client, and continue listening for more messages
@@ -36,25 +37,25 @@ fn sse_response(
                         Err(e) => {
                             match e {
                                 tokio::sync::broadcast::error::RecvError::Closed => {
-                                    tracing::error!(error = ?e, "Broadcasting pipeline to SSE somehow closed, should not see this message!")
+                                    tracing::error!(error = ?e, "Broadcasting pipeline to SSE somehow closed, should not see this message!");
                                 },
                                 tokio::sync::broadcast::error::RecvError::Lagged(lag_count) => {
-                                    tracing::error!(error = ?e, "SSE has missed {} messages from broadcaster", lag_count)
+                                    tracing::error!(error = ?e, "SSE has missed {} messages from broadcaster", lag_count);
                                 },
-                            };
+                            }
                         },
                     }
                 },
-            };
-        };
+            }
+        }
     };
 
     Sse::new(stream).keep_alive(KeepAlive::default())
 }
 
 /// Resources:
-/// https://github.com/tokio-rs/axum/discussions/1670
-/// https://github.com/tokio-rs/axum/discussions/2264
+/// `<https://github.com/tokio-rs/axum/discussions/1670>`
+/// `<https://github.com/tokio-rs/axum/discussions/2264>`
 pub async fn sse_handler(
     State(app_state): State<Arc<WebApplicationState>>,
     TypedHeader(authorization): TypedHeader<Authorization<Basic>>,

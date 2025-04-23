@@ -10,6 +10,7 @@ pub struct Poster {
 }
 
 impl Poster {
+    #[must_use]
     pub fn new(proxy: &ExternalProxy) -> Self {
         let http_client = reqwest::Client::new()
             .post(format!("{}{}", proxy.url, PUBLISH_URL))

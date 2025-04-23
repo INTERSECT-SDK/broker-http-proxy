@@ -7,6 +7,7 @@ use tracing_subscriber::{fmt::MakeWriter, layer::SubscriberExt, EnvFilter, Regis
 /// Compose multiple layers into a `tracing`'s subscriber.
 ///
 /// This one uses a "pretty" format which is easier for developers to directly read in a terminal.
+#[must_use]
 pub fn get_pretty_subscriber(env_filter_arg: String) -> impl Subscriber + Send + Sync {
     let env_filter = EnvFilter::new(env_filter_arg);
     Registry::default()
@@ -18,6 +19,7 @@ pub fn get_pretty_subscriber(env_filter_arg: String) -> impl Subscriber + Send +
 ///
 /// This one will log everything in a JSON format, good for production systems (i.e. Elasticsearch)
 /// but is kind of unreadable for developers
+#[must_use]
 pub fn get_json_subscriber<Sink>(
     name: String,
     env_filter_arg: String,
@@ -36,6 +38,9 @@ where
 /// Register a subscriber as global default to process span data.
 ///
 /// It should only be called once!
+///
+/// # Panics
+///   - Panics if the logger can't be set
 pub fn init_subscriber(subscriber: impl Subscriber + Send + Sync) {
     LogTracer::init().expect("Failed to set logger");
     set_global_default(subscriber).expect("Failed to set subscriber");

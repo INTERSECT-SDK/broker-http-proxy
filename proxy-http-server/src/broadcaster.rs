@@ -18,6 +18,7 @@ pub struct Broadcaster {
 impl Broadcaster {
     /// Create the broadcaster. Note that it automatically wraps it in an Arc.
     /// The broadcaster manages its producer but does not manage its consumers
+    #[must_use]
     pub fn new() -> Arc<Self> {
         // use a fairly large channel capacity to account for potential receiver lags
         let (tx, _) = broadcast::channel(256);
@@ -25,6 +26,7 @@ impl Broadcaster {
     }
 
     /// Add a broadcaster consumer - the calling function is responsible for cleaning up the consumer
+    #[must_use]
     pub fn add_client(&self) -> broadcast::Receiver<Event> {
         self.fanout.subscribe()
     }
@@ -41,6 +43,7 @@ impl Broadcaster {
     /// 3) Somehow transfer these messages over to the other message broker, make the messages their responsibility.
     ///
     /// Once the messages are on the other message broker, proxy-http-server and proxy-http-client don't need to care, handling them will be the SDK's job.
+    #[must_use]
     pub fn broadcast(&self, event: &str) -> usize {
         self.fanout.send(Event::default().data(event)).unwrap_or(0)
     }

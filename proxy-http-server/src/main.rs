@@ -33,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // set up broker connection pool
-    let pool = get_connection_pool(&configuration.broker).await;
+    let pool = get_connection_pool(&configuration.broker);
     if let Err(msg) = verify_connection_pool(&pool, APPLICATION_NAME).await {
         tracing::error!(msg);
         std::process::exit(1);
@@ -54,9 +54,11 @@ async fn main() -> anyhow::Result<()> {
         pool,
         configuration.topic_prefix.clone(),
         APPLICATION_NAME.into(),
-        broadcaster.clone(),
+        broadcaster,
         rx,
     );
+
+    drop(configuration);
 
     application.run_until_stopped().await?;
 
