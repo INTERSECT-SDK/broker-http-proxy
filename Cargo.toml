@@ -16,7 +16,7 @@ secrecy = { version = "0.10.3", features = ["serde"] }
 serde = { version = "1.0.217", features = ["derive"] }
 serde-aux = "4.6.0"
 serde_json = { version = "1.0.138", features = ["raw_value"] }
-tokio = { version = "1.43.0", features = ["full"] }
+tokio = { version = "1.44.2", features = ["full"] }
 tokio-stream = "0.1.17"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["registry", "env-filter"] }
