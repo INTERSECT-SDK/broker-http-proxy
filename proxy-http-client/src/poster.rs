@@ -29,6 +29,18 @@ impl HttpBroadcast for Poster {
             .body(event)
             .send()
             .await;
-        result.is_ok()
+        if result.is_ok() {
+            let result = result.unwrap();
+            let status = result.status().as_u16();
+            match result.bytes().await {
+                Ok(bytes) => tracing::debug!("{:?}", bytes),
+                Err(err) => tracing::debug!("ERROR: {}", err.to_string()),
+            }
+            status < 400
+        } else {
+            let result = result.unwrap_err();
+            tracing::error!("response is error {}", result.to_string());
+            false
+        }
     }
 }
