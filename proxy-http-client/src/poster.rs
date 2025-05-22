@@ -36,7 +36,8 @@ impl HttpBroadcast for Poster {
                 Ok(bytes) => tracing::debug!("{:?}", bytes),
                 Err(err) => tracing::debug!("ERROR: {}", err.to_string()),
             }
-            status < 400
+            // if we get a client error, drop the message entirely; if we get a server error, requeue the message for later
+            status < 500
         } else {
             let result = result.unwrap_err();
             tracing::error!("response is error {}", result.to_string());
