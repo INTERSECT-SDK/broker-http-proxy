@@ -15,8 +15,6 @@ name = "proxy-http-client"
 [dependencies]
 anyhow = { workspace = true }
 async-stream = { workspace = true }
-amqprs = { workspace = true }
-config = { workspace = true }
 deadpool-amqprs = { workspace = true }
 futures = { workspace = true }
 secrecy = { workspace = true }
@@ -28,5 +26,6 @@ tokio-stream = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
 intersect-ingress-proxy-common = { path = "../shared-deps", version = "0.1.0" }
-reqwest = "0.12.14"
-reqwest-eventsource = "0.6.0"
+# rustls is only necessary if you don't want to dynamically link to openssl, this specific feature also provides certificates so you don't need ca-certificates
+reqwest = { version = "0.12", features = ["rustls-tls"] }
+reqwest-eventsource = "0.6"

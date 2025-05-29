@@ -6,21 +6,21 @@ resolver = "2"
 
 # shared dependencies across all applications
 [workspace.dependencies]
-anyhow = "1.0.95"
-async-stream = "0.3.6"
-amqprs = { version = "2.1", features = ["traces"] }
-config = { version = "0.14.1", default-features = false, features = ["yaml"] }  # TODO check to see why this can't be upgraded to v15
-deadpool-amqprs = "0.3.0"
-futures = "0.3.31"
-secrecy = { version = "0.10.3", features = ["serde"] }
-serde = { version = "1.0.217", features = ["derive"] }
-serde-aux = "4.6.0"
-serde_json = { version = "1.0.138", features = ["raw_value"] }
-tokio = { version = "1.44.2", features = ["full"] }
-tokio-stream = "0.1.17"
-tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["registry", "env-filter"] }
-uuid = { version = "1.13.1", features = ["v4"] }
+anyhow = "1"
+async-stream = "0.3"
+amqprs = { version = "2", features = ["traces"] }
+config = { version = "0.14", default-features = false, features = ["yaml"] }  # TODO check to see why this can't be upgraded to v15
+deadpool-amqprs = "0.3"
+futures = "0.3"
+secrecy = { version = "0.10", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde-aux = "4"
+serde_json = { version = "1", features = ["raw_value"] }
+tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["registry", "env-filter"] }
+uuid = { version = "1", features = ["v4"] }
 
 [workspace.package]
 version = "0.1.0"
