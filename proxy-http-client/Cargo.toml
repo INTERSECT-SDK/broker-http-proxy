@@ -26,6 +26,17 @@ tokio-stream = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
 intersect-ingress-proxy-common = { path = "../shared-deps", version = "0.1.0" }
-# rustls is only necessary if you don't want to dynamically link to openssl, this specific feature also provides certificates so you don't need ca-certificates
-reqwest = { version = "0.12", features = ["rustls-tls"] }
 reqwest-eventsource = "0.6"
+
+# when not targeting muslc, we can just dynamically link to the system openssl
+[target.'cfg(not(target_env = "musl"))'.dependencies.reqwest]
+version = "0.12"
+
+# on musl, use rustls in place of the system openssl and ca-certificates, as we compile a static binary.
+[target.'cfg(all(target_env = "musl"))'.dependencies.reqwest]
+version = "0.12"
+default-features = false
+features = ["rustls-tls", "charset", "http2", "system-proxy"]
+
+[target.'cfg(all(target_env = "musl", target_pointer_width = "64"))'.dependencies.jemallocator]
+version = "0.5"

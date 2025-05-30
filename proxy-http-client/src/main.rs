@@ -14,6 +14,11 @@ use proxy_http_client::{configuration::Settings, event_source::event_source_loop
 
 const APPLICATION_NAME: &str = "proxy-http-client";
 
+// Muslc has a slow allocator, but we can only use jemalloc on 64-bit systems since jemalloc doesn't support i686.
+#[cfg(all(target_env = "musl", target_pointer_width = "64"))]
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 #[tokio::main]
 pub async fn main() -> anyhow::Result<()> {
     let configuration = get_configuration::<Settings>().expect("Failed to read configuration");

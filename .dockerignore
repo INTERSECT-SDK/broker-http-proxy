@@ -1,6 +1,8 @@
 *
 !proxy-http-client
+proxy-http-client/**/*.ya?ml
 !proxy-http-server
+proxy-http-server/**/*.ya?ml
 !shared-deps
 !Cargo.lock
 !Cargo.toml
