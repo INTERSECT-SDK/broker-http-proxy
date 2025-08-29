@@ -1,6 +1,4 @@
-# Simple docker-compose file which sets up all needed backing services
-# Note that for the broker, the default credentials are ` intersect_username / intersect_password `
-# NOTE: DOES NOT CONTAIN APPLICATION, ONLY BACKING SERVICES
+# docker-compose file which sets up all needed backing services + applications
 
 services:
   broker_1:
