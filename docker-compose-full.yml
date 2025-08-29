@@ -1,0 +1,94 @@
+# Simple docker-compose file which sets up all needed backing services
+# Note that for the broker, the default credentials are ` intersect_username / intersect_password `
+# NOTE: DOES NOT CONTAIN APPLICATION, ONLY BACKING SERVICES
+
+services:
+  broker_1:
+    image: "bitnami/rabbitmq:3.13.3"
+    #network_mode: host
+    ports:
+      - "1883:1883" # MQTT port
+      - "5672:5672" # AMQP port
+      - "15672:15672" # Web UI
+    environment:
+      # full list of env variables available at https://github.com/bitnami/containers/blob/main/bitnami/rabbitmq/README.md
+      RABBITMQ_PLUGINS: "rabbitmq_management rabbitmq_mqtt"
+      RABBITMQ_USERNAME: "intersect_username"
+      RABBITMQ_PASSWORD: "intersect_password"
+      RABBITMQ_MANAGEMENT_ALLOW_WEB_ACCESS: "yes"
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping && rabbitmq-diagnostics -q check_running && rabbitmq-diagnostics -q check_local_alarms
+      interval: 10s
+      retries: 5
+      start_period: 10s
+      timeout: 10s
+
+  # add 1 to each port number for the second broker
+  broker_2:
+    image: "bitnami/rabbitmq:3.13.3"
+    ports:
+      - "1884:1883" # MQTT port
+      - "5673:5672" # AMQP port
+      - "15673:15672" # Web UI
+    environment:
+      # full list of env variables available at https://github.com/bitnami/containers/blob/main/bitnami/rabbitmq/README.md
+      RABBITMQ_PLUGINS: "rabbitmq_management rabbitmq_mqtt"
+      RABBITMQ_USERNAME: "intersect_username"
+      RABBITMQ_PASSWORD: "intersect_password"
+      RABBITMQ_MANAGEMENT_ALLOW_WEB_ACCESS: "yes"
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping && rabbitmq-diagnostics -q check_running && rabbitmq-diagnostics -q check_local_alarms
+      interval: 10s
+      retries: 5
+      start_period: 10s
+      timeout: 10s
+
+  proxy-server-on-broker-1:
+    image: proxy-server
+    build:
+      context: .
+      args:
+        BIN_NAME: "proxy-http-server"
+    ports:
+      - "8080:8080"
+    environment:
+      PROXYAPP_PRODUCTION: "true"
+      PROXYAPP_LOG_LEVEL: "debug" 
+      PROXYAPP_BROKER__USERNAME: "intersect_username"
+      PROXYAPP_BROKER__PASSWORD: "intersect_password"
+      PROXYAPP_BROKER__HOST: "broker_1"
+      PROXYAPP_BROKER__PORT: 5672 
+      PROXYAPP_TOPIC_PREFIX: "org.fac.sys"
+      PROXYAPP_APP_PORT: 8080
+      PROXYAPP_USERNAME: "username"
+      PROXYAPP_PASSWORD: "password"
+    depends_on:
+      broker_1:
+        condition: service_healthy
+        restart: true
+      broker_2:
+        condition: service_healthy
+        restart: true
+
+  proxy-client-on-broker-2:
+    image: proxy-client
+    build:
+      context: .
+      args:
+        BIN_NAME: "proxy-http-client"
+    environment:
+      PROXYAPP_PRODUCTION: "true"
+      PROXYAPP_LOG_LEVEL: "debug" 
+      PROXYAPP_BROKER__USERNAME: "intersect_username"
+      PROXYAPP_BROKER__PASSWORD: "intersect_password"
+      PROXYAPP_BROKER__HOST: "broker_2"
+      PROXYAPP_BROKER__PORT: 5672
+      PROXYAPP_TOPIC_PREFIX: "org.fac.sys"
+      PROXYAPP_OTHER_PROXY__URL: "http://proxy-server-on-broker-1:8080" 
+      PROXYAPP_OTHER_PROXY__USERNAME: "username"
+      PROXYAPP_OTHER_PROXY__PASSWORD: "password"
+    depends_on:
+      proxy-server-on-broker-1:
+        condition: service_started
+        restart: true
+
