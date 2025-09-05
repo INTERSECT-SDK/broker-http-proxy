@@ -11,14 +11,14 @@ use secrecy::ExposeSecret;
 use std::convert::Infallible;
 use std::sync::Arc;
 
-use crate::webapp::WebApplicationState;
+use crate::webapp_state::WebApplicationState;
 use intersect_ingress_proxy_common::signals::wait_for_os_signal;
 
 #[allow(clippy::needless_pass_by_value)]
 fn sse_response(
-    app_state: Arc<WebApplicationState>,
+    app_state: Arc<impl WebApplicationState>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
-    let mut rx = app_state.broadcaster.add_client();
+    let mut rx = app_state.get_broadcaster().add_client();
 
     let stream = async_stream::stream! {
         loop {
@@ -57,11 +57,11 @@ fn sse_response(
 /// `<https://github.com/tokio-rs/axum/discussions/1670>`
 /// `<https://github.com/tokio-rs/axum/discussions/2264>`
 pub async fn sse_handler(
-    State(app_state): State<Arc<WebApplicationState>>,
+    State(app_state): State<Arc<impl WebApplicationState + 'static>>,
     TypedHeader(authorization): TypedHeader<Authorization<Basic>>,
 ) -> impl IntoResponse {
-    if authorization.username() != app_state.username
-        || authorization.password() != app_state.password.expose_secret()
+    if authorization.username() != app_state.get_username()
+        || authorization.password() != app_state.get_password().expose_secret()
     {
         return (StatusCode::UNAUTHORIZED, "unauthorized").into_response();
     }
