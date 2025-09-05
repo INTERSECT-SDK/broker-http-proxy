@@ -166,6 +166,7 @@ app:
   broker:
     host: "127.0.0.1"
     port: "5672"
+    protocol: "amqp" # or "mqtt"
     username: ""
     password:
       isSecret: false

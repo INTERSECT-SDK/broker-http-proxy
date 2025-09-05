@@ -107,6 +107,8 @@ spec:
               value: {{ .Values.app.broker.host | quote }}
             - name: PROXYAPP_BROKER__PORT
               value: {{ .Values.app.broker.port | quote }}
+            - name: PROXYAPP_BROKER__PROTOCOL
+              value: {{ .Values.app.broker.protocol | quote }}
             - name: PROXYAPP_OTHER_PROXY__URL
               value: {{ .Values.app.other_proxy.url | quote }}
             - name: PROXYAPP_OTHER_PROXY__USERNAME
