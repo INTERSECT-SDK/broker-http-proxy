@@ -7,6 +7,34 @@ use secrecy::SecretString;
 use serde::{de::Error as deError, Deserialize, Deserializer};
 use serde_aux::field_attributes::deserialize_number_from_string;
 
+#[derive(serde::Deserialize, Copy, Clone, Debug)]
+#[repr(u8)]
+pub enum Protocol {
+    Amqp,
+    Mqtt,
+}
+
+impl FromStr for Protocol {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "amqp" => Ok(Protocol::Amqp),
+            "mqtt" => Ok(Protocol::Mqtt),
+            wrong => Err(format!("'{wrong}' is not a valid protocol")),
+        }
+    }
+}
+
+impl Display for Protocol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Protocol::Amqp => f.write_str("amqp"),
+            Protocol::Mqtt => f.write_str("mqtt"),
+        }
+    }
+}
+
 #[derive(serde::Deserialize, Clone, Debug)]
 pub struct BrokerSettings {
     /// broker username
@@ -18,6 +46,7 @@ pub struct BrokerSettings {
     pub port: u16,
     /// broker hostname
     pub host: String,
+    pub protocol: Protocol,
 }
 
 #[derive(serde::Deserialize, Clone, Debug)]

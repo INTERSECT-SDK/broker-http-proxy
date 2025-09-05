@@ -5,15 +5,13 @@ use axum_extra::{
     headers::{authorization::Basic, Authorization},
     TypedHeader,
 };
+use intersect_ingress_proxy_common::protocols::ProtoHandler;
 use secrecy::ExposeSecret;
 use std::sync::Arc;
 
 use intersect_ingress_proxy_common::intersect_messaging::extract_eventsource_data;
-use intersect_ingress_proxy_common::protocols::amqp::{
-    get_channel, is_routing_key_compliant, publish::amqp_publish_message,
-};
 
-use crate::webapp::WebApplicationState;
+use crate::webapp_state::WebApplicationState;
 
 /// HTTP POST endpoint which will publish a message meeting the INTERSECT specification
 ///
@@ -22,12 +20,12 @@ use crate::webapp::WebApplicationState;
 ///   - Sends back a 400 if the message body is improperly formatted
 ///   - Sends back a 500 if the server was unable to send the message
 pub async fn publish_message(
-    State(app_state): State<Arc<WebApplicationState>>,
+    State(app_state): State<Arc<impl WebApplicationState>>,
     TypedHeader(authorization): TypedHeader<Authorization<Basic>>,
     request: Request,
 ) -> Result<(StatusCode, String), (StatusCode, String)> {
-    if authorization.username() != app_state.username
-        || authorization.password() != app_state.password.expose_secret()
+    if authorization.username() != app_state.get_username()
+        || authorization.password() != app_state.get_password().expose_secret()
     {
         return Err((StatusCode::UNAUTHORIZED, "unauthorized".to_string()));
     }
@@ -48,41 +46,22 @@ pub async fn publish_message(
             "body is not valid INTERSECT format".to_string(),
         )
     })?;
-    if !is_routing_key_compliant(&topic) {
-        tracing::warn!(
-            "{} is not a valid AMQP topic name, will not attempt publish",
-            topic
-        );
-        return Err((
-            StatusCode::BAD_REQUEST,
-            format!("{topic} is not a valid AMQP topic name"),
-        ));
+
+    if let Err(e) = app_state.get_proto_handler().preverify_publish(&topic) {
+        return Err((StatusCode::BAD_REQUEST, e));
     }
+
     tracing::debug!("Publishing message with topic: {}", &topic);
 
-    let connection = app_state.amqp_connection_pool.get().await.map_err(|e| {
-        tracing::error!(error = ?e, "cannot connect to broker");
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "server fault, message not published".to_string(),
-        )
-    })?;
-
-    let channel = get_channel(&connection).await.map_err(|e| {
-        tracing::error!(error = ?e, "cannot create channel on broker");
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "server fault, message not published".to_string(),
-        )
-    })?;
-    amqp_publish_message(channel, &topic, data)
+    match app_state
+        .get_proto_handler()
+        .publish_message(&topic, data)
         .await
-        .map_err(|()| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "server fault, message not published".to_string(),
-            )
-        })?;
-
-    Ok((StatusCode::CREATED, "Success".to_string()))
+    {
+        Ok(_) => Ok((StatusCode::CREATED, "Success".to_string())),
+        Err(_) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "server fault, message not published".to_string(),
+        )),
+    }
 }

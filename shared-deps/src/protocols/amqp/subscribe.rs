@@ -10,21 +10,12 @@ use uuid::Uuid;
 
 use crate::intersect_messaging::{make_eventsource_data, should_message_passthrough};
 use crate::protocols::amqp::{get_channel, verify_connection_pool};
-
-/// Trait which should be implemented by the application to handle a formatted message, ready to send to a server or clients
-pub trait HttpBroadcast {
-    /// Return true if we can consider the event to be successfully "published"
-    /// note that this does not *have* to have an asynchronous internal implementation, it should just allow for one
-    fn publish_event_to_http(
-        &self,
-        event: String,
-    ) -> impl std::future::Future<Output = bool> + Send;
-}
+use crate::protocols::HttpBroadcast;
 
 pub fn broker_consumer_loop(
     amqp_connection_pool: Pool,
     config_topic: String,
-    queue_name_src: String,
+    queue_name_src: &'static str,
     broadcaster: Arc<impl HttpBroadcast + Send + Sync + 'static>,
     killswitch: Receiver<()>,
 ) -> tokio::task::JoinHandle<()> {
@@ -43,7 +34,7 @@ pub fn broker_consumer_loop(
 async fn broker_consumer_loop_inner(
     amqp_connection_pool: Pool,
     config_topic: String,
-    queue_name_src: String,
+    queue_name_src: &str,
     broadcaster: Arc<impl HttpBroadcast + Send + Sync + 'static>,
     // calls recv() once the EventSource loop or HTTP server catches an OS signal
     mut killswitch: Receiver<()>,
@@ -69,7 +60,7 @@ async fn broker_consumer_loop_inner(
         }
 
         if needs_reverification {
-            if let Err(e) = verify_connection_pool(&amqp_connection_pool, &queue_name_src).await {
+            if let Err(e) = verify_connection_pool(&amqp_connection_pool, queue_name_src).await {
                 tracing::warn!(error = ?e, "Couldn't fully recover broker setup");
                 continue;
             }
@@ -84,7 +75,7 @@ async fn broker_consumer_loop_inner(
         let channel = channel_result.unwrap();
 
         // Do NOT automatically acknowledge messages, we may not be able to forward them.
-        let args = BasicConsumeArguments::new(&queue_name_src, &Uuid::new_v4().to_string())
+        let args = BasicConsumeArguments::new(queue_name_src, &Uuid::new_v4().to_string())
             .manual_ack(true) // only ack messages we should actually publish, we will nack the others
             .finish();
 

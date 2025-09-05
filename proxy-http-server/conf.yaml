@@ -6,6 +6,7 @@ broker:
   host: "127.0.0.1"
   # note: differs from other config file (two separate brokers used)
   port: 5672
+  protocol: "amqp"
 # use amqp topic notation
 topic_prefix: "organization.facility.system"  # CHANGE THIS PER DEPLOYMENT!!!
 log_level: "debug"
