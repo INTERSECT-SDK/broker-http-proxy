@@ -1,6 +1,6 @@
 use secrecy::ExposeSecret;
 
-use intersect_ingress_proxy_common::protocols::HttpBroadcast;
+use intersect_ingress_proxy_common::protocols::interfaces::HttpBroadcast;
 use intersect_ingress_proxy_common::server_paths::PUBLISH_URL;
 
 use crate::configuration::ExternalProxy;

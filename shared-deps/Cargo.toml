@@ -14,6 +14,7 @@ async-stream = { workspace = true }
 config = { workspace = true }
 deadpool-amqprs = { workspace = true }
 futures = { workspace = true }
+rumqttc = { workspace = true }
 secrecy = { workspace = true }
 serde = { workspace = true }
 serde-aux = { workspace = true }

@@ -4,7 +4,8 @@ use tokio::sync::oneshot;
 
 use intersect_ingress_proxy_common::configuration::get_configuration;
 use intersect_ingress_proxy_common::protocols::{
-    amqp::AmqpProtoHandler, mqtt::MqttProtoHandler, ProtoHandler,
+    amqp::init::init_amqp_proto_handlers, interfaces::SubscribeProtoHandler,
+    mqtt::init::init_mqtt_proto_handlers,
 };
 use intersect_ingress_proxy_common::telemetry::{
     get_json_subscriber, get_pretty_subscriber, init_subscriber,
@@ -24,7 +25,7 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 async fn begin_execution(
     configuration: Settings,
-    proto_handler: impl ProtoHandler,
+    subscribe_proto_handler: impl SubscribeProtoHandler,
     application: impl WebApplication,
     broadcaster: Arc<Broadcaster>,
 ) -> anyhow::Result<()> {
@@ -35,8 +36,11 @@ async fn begin_execution(
     // - This allows us to "finish up" publishing a message to our broker before killing the application.
     let (tx, rx) = oneshot::channel();
 
-    let broker_join_handle =
-        proto_handler.begin_subscribe_loop(configuration.topic_prefix.clone(), broadcaster, rx);
+    let broker_join_handle = subscribe_proto_handler.begin_subscribe_loop(
+        configuration.topic_prefix.clone(),
+        broadcaster,
+        rx,
+    );
 
     drop(configuration);
 
@@ -67,38 +71,53 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let broadcaster = Broadcaster::new();
+
     match configuration.broker.protocol {
         intersect_ingress_proxy_common::configuration::Protocol::Amqp => {
-            let proto_handler =
-                AmqpProtoHandler::new(&configuration.broker, APPLICATION_NAME).await;
-            if proto_handler.is_err() {
-                tracing::error!("{}", proto_handler.unwrap_err());
-                std::process::exit(1);
+            match init_amqp_proto_handlers(&configuration.broker, APPLICATION_NAME).await {
+                Ok((publish_proto_handler, subscribe_proto_handler)) => {
+                    let web_server = AmqpWebApplication::build(
+                        &configuration,
+                        broadcaster.clone(),
+                        publish_proto_handler,
+                    )
+                    .await?;
+                    begin_execution(
+                        configuration,
+                        subscribe_proto_handler,
+                        web_server,
+                        broadcaster,
+                    )
+                    .await
+                }
+                Err(err) => {
+                    tracing::error!("AMQP broker: initial verification problem -- {err}");
+                    std::process::exit(1);
+                }
             }
-            let proto_handler = proto_handler.unwrap();
-            let web_server = AmqpWebApplication::build(
-                &configuration,
-                broadcaster.clone(),
-                proto_handler.clone(),
-            )
-            .await?;
-            begin_execution(configuration, proto_handler, web_server, broadcaster).await
         }
         intersect_ingress_proxy_common::configuration::Protocol::Mqtt => {
-            let proto_handler =
-                MqttProtoHandler::new(&configuration.broker, APPLICATION_NAME).await;
-            if proto_handler.is_err() {
-                tracing::error!("{}", proto_handler.unwrap_err());
-                std::process::exit(1);
+            match init_mqtt_proto_handlers(&configuration.broker, APPLICATION_NAME).await {
+                Ok((publish_proto_handler, subscribe_proto_handler)) => {
+                    let web_server = MqttWebApplication::build(
+                        &configuration,
+                        broadcaster.clone(),
+                        publish_proto_handler,
+                    )
+                    .await?;
+                    begin_execution(
+                        configuration,
+                        subscribe_proto_handler,
+                        web_server,
+                        broadcaster,
+                    )
+                    .await
+                }
+                Err(err) => {
+                    tracing::error!("MQTT broker: initial verification problem -- {err}");
+                    std::process::exit(1);
+                }
             }
-            let proto_handler = proto_handler.unwrap();
-            let web_server = MqttWebApplication::build(
-                &configuration,
-                broadcaster.clone(),
-                proto_handler.clone(),
-            )
-            .await?;
-            begin_execution(configuration, proto_handler, web_server, broadcaster).await
         }
     }
 }

@@ -9,26 +9,51 @@ use tokio::sync::oneshot::Receiver;
 use uuid::Uuid;
 
 use crate::intersect_messaging::{make_eventsource_data, should_message_passthrough};
-use crate::protocols::amqp::{get_channel, verify_connection_pool};
-use crate::protocols::HttpBroadcast;
+use crate::protocols::amqp::utils::{get_channel, verify_connection_pool};
+use crate::protocols::interfaces::{HttpBroadcast, SubscribeProtoHandler};
 
-pub fn broker_consumer_loop(
-    amqp_connection_pool: Pool,
-    config_topic: String,
-    queue_name_src: &'static str,
-    broadcaster: Arc<impl HttpBroadcast + Send + Sync + 'static>,
-    killswitch: Receiver<()>,
-) -> tokio::task::JoinHandle<()> {
-    tokio::spawn(async move {
-        broker_consumer_loop_inner(
-            amqp_connection_pool,
-            config_topic,
-            queue_name_src,
-            broadcaster,
-            killswitch,
-        )
-        .await;
-    })
+#[derive(Clone)]
+pub struct AmqpSubscribeProtoHandler {
+    pool: Pool,
+    /// application_name is used for the hardcoded queue name and for debugging purposes
+    application_name: &'static str,
+}
+
+impl std::fmt::Debug for AmqpSubscribeProtoHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AmqpSubscribeProtoHandler")
+            .field("application_name", &self.application_name)
+            .finish()
+    }
+}
+
+impl AmqpSubscribeProtoHandler {
+    pub fn new(pool: Pool, application_name: &'static str) -> Self {
+        Self {
+            pool,
+            application_name,
+        }
+    }
+}
+
+impl SubscribeProtoHandler for AmqpSubscribeProtoHandler {
+    fn begin_subscribe_loop(
+        self,
+        config_topic: String,
+        broadcaster: Arc<impl HttpBroadcast + Send + Sync + 'static>,
+        killswitch: Receiver<()>,
+    ) -> tokio::task::JoinHandle<()> {
+        tokio::spawn(async move {
+            broker_consumer_loop_inner(
+                self.pool,
+                config_topic,
+                self.application_name,
+                broadcaster,
+                killswitch,
+            )
+            .await;
+        })
+    }
 }
 
 async fn broker_consumer_loop_inner(

@@ -5,7 +5,7 @@ use axum_extra::{
     headers::{authorization::Basic, Authorization},
     TypedHeader,
 };
-use intersect_ingress_proxy_common::protocols::ProtoHandler;
+use intersect_ingress_proxy_common::protocols::interfaces::PublishProtoHandler;
 use secrecy::ExposeSecret;
 use std::sync::Arc;
 

@@ -3,14 +3,17 @@ use reqwest_eventsource::{Event, EventSource};
 use secrecy::ExposeSecret;
 
 use intersect_ingress_proxy_common::intersect_messaging::extract_eventsource_data;
-use intersect_ingress_proxy_common::protocols::ProtoHandler;
+use intersect_ingress_proxy_common::protocols::interfaces::PublishProtoHandler;
 use intersect_ingress_proxy_common::server_paths::SUBSCRIBE_URL;
 use intersect_ingress_proxy_common::signals::wait_for_os_signal;
 
 use crate::configuration::ExternalProxy;
 
 /// Return Err only if we weren't able to publish a correct message to the broker, invalid messages are ignored
-async fn send_message(message: String, proto_handler: &impl ProtoHandler) -> Result<(), &str> {
+async fn send_message(
+    message: String,
+    proto_handler: &impl PublishProtoHandler,
+) -> Result<(), &str> {
     let es_data_result = extract_eventsource_data(&message);
     if es_data_result.is_err() {
         return Ok(());
@@ -26,7 +29,7 @@ async fn send_message(message: String, proto_handler: &impl ProtoHandler) -> Res
 ///   - Inner API could potentially panic but is currently not expected to do so
 pub async fn event_source_loop(
     other_proxy: ExternalProxy,
-    connection_pool: &impl ProtoHandler,
+    proto_handler: impl PublishProtoHandler,
 ) -> i32 {
     let mut es = EventSource::new(
         reqwest::Client::new()
@@ -55,7 +58,7 @@ pub async fn event_source_loop(
                                 tracing::info!("connected to {}", &other_proxy.url);
                             },
                             Ok(Event::Message(message)) => {
-                                if let Err(e) = send_message(message.data, connection_pool).await {
+                                if let Err(e) = send_message(message.data, &proto_handler).await {
                                     tracing::error!(e);
                                 };
                             },
