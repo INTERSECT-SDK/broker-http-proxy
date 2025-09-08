@@ -5,7 +5,10 @@ use secrecy::ExposeSecret;
 
 use crate::{
     configuration::BrokerSettings,
-    protocols::mqtt::{publish::MqttPublishProtoHandler, subscribe::MqttSubscribeProtoHandler},
+    protocols::mqtt::{
+        publish::MqttPublishProtoHandler, subscribe::MqttSubscribeProtoHandler,
+        utils::subscribe_all,
+    },
 };
 
 /// Sets up the MQTT proto handlers, and verifies that we can connect to the MQTT broker.
@@ -25,7 +28,8 @@ pub async fn init_mqtt_proto_handlers(
     // TODO may want to handle message sizes >= 4 GiB
     mqtt_options.set_max_packet_size(1 << 32, 1 << 32);
     mqtt_options.set_clean_session(false);
-    mqtt_options.set_manual_acks(true);
+    // TODO - implement manual acks
+    // mqtt_options.set_manual_acks(true);
     mqtt_options.set_keep_alive(Duration::from_secs(60));
 
     let (mqtt_client, mut mqtt_event_loop) = AsyncClient::new(mqtt_options, 256);
@@ -57,6 +61,9 @@ pub async fn init_mqtt_proto_handlers(
             return Err(err.to_string());
         }
     }
+
+    // listen for every single message on the exchange, we must do this due to the way userspace messages work
+    subscribe_all(&mqtt_client).await?;
 
     let publish_handler = MqttPublishProtoHandler::new(application_name, mqtt_client.clone());
     let subscribe_handler =

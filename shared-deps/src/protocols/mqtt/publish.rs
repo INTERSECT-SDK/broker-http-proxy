@@ -1,6 +1,7 @@
-use rumqttc::AsyncClient;
+use rumqttc::{AsyncClient, QoS};
 
 use crate::protocols::interfaces::PublishProtoHandler;
+use crate::protocols::proxy::is_routing_key_compliant;
 
 #[derive(Clone)]
 pub struct MqttPublishProtoHandler {
@@ -28,9 +29,20 @@ impl MqttPublishProtoHandler {
 
 impl PublishProtoHandler for MqttPublishProtoHandler {
     fn preverify_publish(&self, topic: &str) -> Result<(), String> {
+        if !is_routing_key_compliant(topic) {
+            return Err(format!(
+                "'{topic}' does not meet the INTERSECT proxy-app routing key specification."
+            ));
+        }
         Ok(())
     }
     async fn publish_message(&self, topic: &str, data: String) -> Result<(), &str> {
-        Err("yippee")
+        self.mqtt_client
+            .publish(topic, QoS::AtLeastOnce, true, data.into_bytes())
+            .await
+            .map_err(|err| {
+                tracing::error!("Could not publish message -- {err}");
+                "could not publish message"
+            })
     }
 }

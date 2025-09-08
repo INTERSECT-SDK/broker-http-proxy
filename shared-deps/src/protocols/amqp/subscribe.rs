@@ -12,7 +12,6 @@ use crate::intersect_messaging::{make_eventsource_data, should_message_passthrou
 use crate::protocols::amqp::utils::{get_channel, verify_connection_pool};
 use crate::protocols::interfaces::{HttpBroadcast, SubscribeProtoHandler};
 
-#[derive(Clone)]
 pub struct AmqpSubscribeProtoHandler {
     pool: Pool,
     /// application_name is used for the hardcoded queue name and for debugging purposes
