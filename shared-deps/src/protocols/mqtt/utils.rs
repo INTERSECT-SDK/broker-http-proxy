@@ -11,5 +11,5 @@ pub(crate) async fn subscribe_all(mqtt_client: &AsyncClient) -> Result<(), Strin
 ///
 /// this should generally happen at some point in the subscribe loop
 pub(crate) fn mqtt_topic_to_proxy_topic(topic: &str) -> String {
-    topic.replace("/", ".")
+    topic.replace('/', ".")
 }

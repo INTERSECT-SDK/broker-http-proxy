@@ -58,7 +58,7 @@ pub async fn publish_message(
         .publish_message(&topic, data)
         .await
     {
-        Ok(_) => Ok((StatusCode::CREATED, "Success".to_string())),
+        Ok(()) => Ok((StatusCode::CREATED, "Success".to_string())),
         Err(_) => Err((
             StatusCode::INTERNAL_SERVER_ERROR,
             "server fault, message not published".to_string(),

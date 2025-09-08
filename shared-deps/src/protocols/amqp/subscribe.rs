@@ -14,7 +14,7 @@ use crate::protocols::interfaces::{HttpBroadcast, SubscribeProtoHandler};
 
 pub struct AmqpSubscribeProtoHandler {
     pool: Pool,
-    /// application_name is used for the hardcoded queue name and for debugging purposes
+    /// `application_name` is used for the hardcoded queue name and for debugging purposes
     application_name: &'static str,
 }
 
@@ -27,6 +27,7 @@ impl std::fmt::Debug for AmqpSubscribeProtoHandler {
 }
 
 impl AmqpSubscribeProtoHandler {
+    #[must_use]
     pub fn new(pool: Pool, application_name: &'static str) -> Self {
         Self {
             pool,
