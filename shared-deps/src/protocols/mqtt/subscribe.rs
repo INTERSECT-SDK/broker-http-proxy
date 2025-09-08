@@ -2,9 +2,13 @@ use std::sync::Arc;
 
 use tokio::sync::oneshot::Receiver;
 
-use rumqttc::{AsyncClient, EventLoop};
+use rumqttc::{AsyncClient, EventLoop, Publish};
 
-use crate::protocols::interfaces::{HttpBroadcast, SubscribeProtoHandler};
+use crate::{
+    intersect_messaging::{make_eventsource_data, should_message_passthrough},
+    protocols::interfaces::{HttpBroadcast, SubscribeProtoHandler},
+    protocols::mqtt::utils::mqtt_topic_to_proxy_topic,
+};
 
 pub struct MqttSubscribeProtoHandler {
     mqtt_client: AsyncClient,
@@ -47,7 +51,6 @@ impl SubscribeProtoHandler for MqttSubscribeProtoHandler {
                 self.mqtt_client,
                 self.mqtt_event_loop,
                 config_topic,
-                self.application_name,
                 broadcaster,
                 killswitch,
             )
@@ -58,13 +61,133 @@ impl SubscribeProtoHandler for MqttSubscribeProtoHandler {
 
 async fn broker_consumer_loop_inner(
     mqtt_client: AsyncClient,
-    mqtt_event_loop: EventLoop,
+    mut mqtt_event_loop: EventLoop,
     config_topic: String,
-    queue_name_src: &str,
     broadcaster: Arc<impl HttpBroadcast + Send + Sync + 'static>,
     // calls recv() once the EventSource loop or HTTP server catches an OS signal
     mut killswitch: Receiver<()>,
 ) {
-    let mut needs_reverification = false;
-    'connection_loop: loop {}
+    let still_connected = loop {
+        tokio::select! {
+            _ = &mut killswitch => {
+                break true;
+            },
+            event_loop_pool = mqtt_event_loop.poll() => {
+                match event_loop_pool {
+                    Ok(event) => {
+                        match event {
+                            rumqttc::Event::Incoming(packet) => {
+                                match packet {
+                                    rumqttc::Packet::Publish(publish_packet) => {
+                                        consume_message(
+                                            publish_packet,
+                                            &mqtt_client,
+                                            &config_topic,
+                                            &broadcaster,
+                                            &mut killswitch,
+                                        ).await;
+                                    },
+                                    packet => {
+                                        tracing::debug!("Incoming packet -- {packet:?}");
+                                    },
+                                }
+                            },
+                            rumqttc::Event::Outgoing(outgoing) => {
+                                tracing::debug!("Outgoing packet -- {outgoing:?}");
+                            },
+                        }
+                    },
+                    Err(conn_err) => {
+                        tracing::warn!("Consumer lost connection to broker, retrying in 5 seconds. Specifics: {conn_err}");
+                        let retry_wait = tokio::time::sleep(std::time::Duration::from_secs(5));
+                        tokio::pin!(retry_wait);
+                        tokio::select! {
+                            _ = &mut killswitch => {
+                                // HTTP component has been shut down, no point in waiting
+                                tracing::warn!("Shutting down while attempting to reconnect to broker");
+                                break false;
+                            },
+                            () = &mut retry_wait => {
+                                continue;
+                            },
+                        }
+                    },
+                }
+            },
+        }
+    };
+    if still_connected {
+        let _ = mqtt_client.disconnect().await;
+    }
+}
+
+async fn consume_message(
+    publish_packet: Publish,
+    // TODO - the client will eventually manually ACK messages
+    _mqtt_client: &AsyncClient,
+    config_topic: &str,
+    broadcaster: &Arc<impl HttpBroadcast + Send + Sync + 'static>,
+    killswitch: &mut Receiver<()>,
+) {
+    let mut should_ack = true;
+    if publish_packet.dup {
+        tracing::warn!("message was redelivered");
+    }
+
+    match String::from_utf8(publish_packet.payload.to_vec()) {
+        Ok(utf8_data) => {
+            tracing::debug!("got raw message data from broker: {}", &utf8_data);
+            match should_message_passthrough(&utf8_data, config_topic) {
+                Err(e) => {
+                    // This should generally not be seen, so log it as a warning
+                    tracing::warn!(error = ?e, "message is valid UTF-8 but not INTERSECT JSON");
+                }
+                Ok(false) => {
+                    tracing::debug!(
+                        "message source is not from this system, will not broadcast it"
+                    );
+                }
+                Ok(true) => {
+                    let topic = mqtt_topic_to_proxy_topic(&publish_packet.topic);
+                    match make_eventsource_data(&topic, &utf8_data) {
+                        Err(_) => {}
+                        Ok(event) => {
+                            tracing::debug!(
+                                "Consume message {}, data: {}",
+                                publish_packet.pkid,
+                                event
+                            );
+                            // TODO handle this better later, see broadcast() documentation for details.
+                            tokio::select! {
+                                _ = killswitch => {
+                                    // WARNING: in the client implementation, this may happen while waiting on a response, resulting in us rejecting a message we actually passed through successfully
+                                    // this would only happen if we actually call publish_event_to_http(), if the killswitch was toggled before reaching here we will always do the killswitch branch.
+                                    tracing::warn!("Got message from broker but did not send it over HTTP, the message will be rejected.");
+                                    should_ack = false;
+                                },
+                                http_result = broadcaster.publish_event_to_http(event) => {
+                                    if !http_result {
+                                        tracing::warn!("Some clients may not have gotten a message, the message will be rejected.");
+                                        should_ack = false;
+                                    }
+                                },
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            // this should generally not be seen, so log as an error
+            tracing::error!(error = ?e, "message data is not UTF-8, cannot be forwarded over SSE");
+        }
+    }
+
+    // TODO implement acknowledgments
+    if !should_ack {
+        tracing::warn!(
+            "We SHOULD be rejecting message {}, ACK is not implemented yet though",
+            publish_packet.pkid
+        );
+    }
 }

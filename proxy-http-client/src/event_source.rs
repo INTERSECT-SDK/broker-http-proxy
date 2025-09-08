@@ -20,6 +20,10 @@ async fn send_message(
     }
     let (topic, data) = es_data_result.unwrap();
 
+    if let Err(e) = proto_handler.preverify_publish(&topic) {
+        tracing::warn!("invalid topic name -- {e}");
+        return Ok(());
+    }
     proto_handler.publish_message(&topic, data).await
 }
 

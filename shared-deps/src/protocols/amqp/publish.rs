@@ -1,7 +1,8 @@
 use amqprs::{channel::BasicPublishArguments, BasicProperties};
 use deadpool_amqprs::Pool;
 
-use crate::protocols::amqp::utils::{get_channel, is_routing_key_compliant};
+use crate::protocols::amqp::utils::get_channel;
+use crate::protocols::proxy::is_routing_key_compliant;
 use crate::{
     intersect_messaging::INTERSECT_MESSAGE_EXCHANGE, protocols::interfaces::PublishProtoHandler,
 };
@@ -34,20 +35,13 @@ impl PublishProtoHandler for AmqpPublishProtoHandler {
     fn preverify_publish(&self, topic: &str) -> Result<(), String> {
         if !is_routing_key_compliant(topic) {
             return Err(format!(
-                "'{topic}' does not meet the AMQP routing key specification"
+                "'{topic}' does not meet the INTERSECT proxy-app routing key specification."
             ));
         }
         Ok(())
     }
 
     async fn publish_message(&self, topic: &str, data: String) -> Result<(), &str> {
-        if !is_routing_key_compliant(topic) {
-            tracing::warn!(
-                "{} is not a valid AMQP topic name, will not attempt publish",
-                topic
-            );
-            return Ok(());
-        }
         let connection = self.pool.get().await.map_err(|e| {
             tracing::error!(error = ?e, "cannot connect to broker");
             "cannot connect to broker"

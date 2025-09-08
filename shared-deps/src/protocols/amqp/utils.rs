@@ -12,7 +12,7 @@ use crate::{configuration::BrokerSettings, intersect_messaging::INTERSECT_MESSAG
 ///
 /// NOTE: calling this function cannot fail on its own, you have to call pool.get().await for it to fail
 #[must_use]
-pub fn get_connection_pool(connection_details: &BrokerSettings) -> Pool {
+pub(crate) fn get_connection_pool(connection_details: &BrokerSettings) -> Pool {
     let mut args = OpenConnectionArguments::new(
         &connection_details.host,
         connection_details.port,
@@ -29,7 +29,10 @@ pub fn get_connection_pool(connection_details: &BrokerSettings) -> Pool {
 ///
 /// # Errors
 ///   - Errors if can't connect to server or has invalid permissions
-pub async fn verify_connection_pool(pool: &Pool, queue_name_src: &str) -> Result<(), String> {
+pub(crate) async fn verify_connection_pool(
+    pool: &Pool,
+    queue_name_src: &str,
+) -> Result<(), String> {
     let connection = pool
         .get()
         .await
@@ -83,7 +86,7 @@ pub async fn verify_connection_pool(pool: &Pool, queue_name_src: &str) -> Result
 ///
 /// # Errors
 ///   - Errors if failure to communicate with broker server
-pub async fn get_channel(connection: &Connection) -> Result<Channel, amqprs::error::Error> {
+pub(crate) async fn get_channel(connection: &Connection) -> Result<Channel, amqprs::error::Error> {
     let channel = connection.open_channel(None).await?;
     channel.register_callback(DefaultChannelCallback).await?;
     Ok(channel)
@@ -104,13 +107,4 @@ async fn make_exchange(channel: &Channel) -> Result<(), amqprs::error::Error> {
                 .finish(),
         )
         .await
-}
-
-/// make sure that the routing key is valid for AMQP
-///
-/// we do not permit publishing on wildcards
-#[must_use]
-pub(crate) fn is_routing_key_compliant(key: &str) -> bool {
-    !key.chars()
-        .any(|c| !c.is_alphanumeric() && c != '-' && c != '_' && c != '.' && c != ':')
 }

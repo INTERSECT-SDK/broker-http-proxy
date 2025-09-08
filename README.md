@@ -84,7 +84,7 @@ Specific configuration structs are in `proxy-http-server/src/configuration.rs` a
 
 ## Setup
 
-### Using the RabbitMQ web management UIs
+### Using the RabbitMQ web management UIs (AMQP)
 
 These instructions assume you are using the docker compose configuration and the default `conf.yaml` configurations for each.
 
@@ -92,7 +92,10 @@ These instructions assume you are using the docker compose configuration and the
 2) Make sure that you have both applications started (do NOT start more than 1 of each). Each application should be connected to a separate broker.
 3) To login to the broker that the server instance uses, go to localhost:15672, username `intersect_username`, password `intersect_password`
 4) To login to the broker that the client instance uses, go to localhost:15673, username `intersect_username`, password `intersect_password`
-5) On each application, click on the `Exchanges` tab, and click on the `intersect-messages` exchange.
+5)
+    - IF AMQP: On each application, click on the `Exchanges` tab, and click on the `intersect-messages` exchange.
+    - IF MQTT: On each application, click on the `Queues and Streams` tab, then click on the queue (it should look like `mqtt-subscription-proxy-http-clientqos1` or `mqtt-subscription-proxy-http-serverqos1`).
+
 6) Make sure that the `Publish message` dropdown is expanded, select the large text area which is labeled with `Payload:`
 
 For the application on `localhost:15672`, set the payload to below (no newlines):
