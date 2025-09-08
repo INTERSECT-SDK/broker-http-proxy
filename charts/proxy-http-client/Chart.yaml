@@ -1,7 +1,7 @@
 apiVersion: v2
 name: proxy-http-client
 description: "Subscribe to events over HTTP from a proxy-http-server instance, and publish them on a local broker"
-version: 0.1.1
+version: 0.1.2
 dependencies:
   - name: common
     repository: oci://registry-1.docker.io/bitnamicharts
