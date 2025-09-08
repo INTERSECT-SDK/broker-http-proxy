@@ -56,7 +56,7 @@ Caveats:
 - while you can have a `client` and a `server` application for both systems, you should only have one of the clients talk to the other's server. Don't connect both clients to both servers.
 
 
-Currently only supports AMQP 0-9-1 as the broker protocol but can potentially support others in the future
+Currently only supports AMQP 0-9-1 and MQTT 3-1-1 as the broker protocols, but can potentially support others in the future
 
 ## Why Rust?
 
@@ -148,3 +148,7 @@ Now it's advisable to [run some INTERSECT-SDK examples](https://github.com/INTER
 - one exchange for all messages for each application (see `shared-deps/src/protocols/amqp/mod.rs` to get name)
 - routing keys will match SDK naming schematics (SOS hierarchy, "." as separator, end with ".{userspace|lifecycle|events}"). The routing key will roughly correspond to the `destination` field in an INTERSECT message, but the `destination` field only exists on userspace messages (event/lifecycle messages do not have a specific destination in mind).
 - The queue name is hardcoded to match the name of the application.
+
+## MQTT setup
+
+- follows similar rationale to AMQP, except does not utilize exchanges.
