@@ -15,8 +15,8 @@ name = "proxy-http-server"
 [dependencies]
 anyhow = { workspace = true }
 async-stream = { workspace = true }
-deadpool-amqprs = { workspace = true }
 futures = { workspace = true }
+rumqttc = { workspace = true }
 secrecy = { workspace = true }
 serde = { workspace = true }
 serde-aux = { workspace = true }

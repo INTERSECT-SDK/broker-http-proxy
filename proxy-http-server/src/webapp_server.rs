@@ -13,7 +13,9 @@ use tower_http::{
 };
 use tracing::Level;
 
-use intersect_ingress_proxy_common::protocols::{amqp::AmqpProtoHandler, mqtt::MqttProtoHandler};
+use intersect_ingress_proxy_common::protocols::{
+    amqp::publish::AmqpPublishProtoHandler, mqtt::publish::MqttPublishProtoHandler,
+};
 use intersect_ingress_proxy_common::server_paths::{PUBLISH_URL, SUBSCRIBE_URL};
 use intersect_ingress_proxy_common::signals::wait_for_os_signal;
 
@@ -70,7 +72,7 @@ impl AmqpWebApplication {
     pub async fn build(
         configuration: &Settings,
         broadcaster: Arc<Broadcaster>,
-        proto_handler: AmqpProtoHandler,
+        proto_handler: AmqpPublishProtoHandler,
     ) -> Result<Self, anyhow::Error> {
         let address = format!(
             "{}:{}",
@@ -125,7 +127,7 @@ impl MqttWebApplication {
     pub async fn build(
         configuration: &Settings,
         broadcaster: Arc<Broadcaster>,
-        proto_handler: MqttProtoHandler,
+        proto_handler: MqttPublishProtoHandler,
     ) -> Result<Self, anyhow::Error> {
         let address = format!(
             "{}:{}",

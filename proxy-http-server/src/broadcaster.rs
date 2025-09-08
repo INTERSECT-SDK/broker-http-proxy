@@ -2,7 +2,7 @@ use axum::response::sse::Event;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
-use intersect_ingress_proxy_common::protocols::HttpBroadcast;
+use intersect_ingress_proxy_common::protocols::interfaces::HttpBroadcast;
 
 /// This broadcaster is an optimized implementation of a single-producer, multi-consumer channel.
 /// The Broadcaster is effectively the "link" between the broker and the HTTP gateway.

@@ -4,7 +4,9 @@ use tokio::sync::oneshot;
 
 use intersect_ingress_proxy_common::configuration::get_configuration;
 use intersect_ingress_proxy_common::protocols::{
-    amqp::AmqpProtoHandler, mqtt::MqttProtoHandler, ProtoHandler,
+    amqp::init::init_amqp_proto_handlers,
+    interfaces::{PublishProtoHandler, SubscribeProtoHandler},
+    mqtt::init::init_mqtt_proto_handlers,
 };
 use intersect_ingress_proxy_common::telemetry::{
     get_json_subscriber, get_pretty_subscriber, init_subscriber,
@@ -21,7 +23,8 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 async fn begin_execution(
     configuration: Settings,
-    proto_handler: impl ProtoHandler,
+    publish_proto_handler: impl PublishProtoHandler,
+    subscribe_proto_handler: impl SubscribeProtoHandler,
 ) -> anyhow::Result<()> {
     // How this works:
     // - Pass in the receiver to the broker consumer loop
@@ -31,7 +34,7 @@ async fn begin_execution(
     // - This allows us to "finish up" publishing a message to our broker before killing the application.
     let (tx, rx) = oneshot::channel();
 
-    let broker_join_handle = proto_handler.begin_subscribe_loop(
+    let broker_join_handle = subscribe_proto_handler.begin_subscribe_loop(
         configuration.topic_prefix.clone(),
         Arc::new(Poster::new(&configuration.other_proxy)),
         rx,
@@ -41,7 +44,7 @@ async fn begin_execution(
     drop(configuration);
 
     // this will run until we get an event source error or we catch an OS signal
-    let rc = event_source_loop(other_proxy, &proto_handler).await;
+    let rc = event_source_loop(other_proxy, publish_proto_handler).await;
 
     tracing::info!("Attempting graceful shutdown: No longer listening for events over HTTP");
     drop(tx);
@@ -69,22 +72,36 @@ async fn main() -> anyhow::Result<()> {
 
     match configuration.broker.protocol {
         intersect_ingress_proxy_common::configuration::Protocol::Amqp => {
-            let proto_handler =
-                AmqpProtoHandler::new(&configuration.broker, APPLICATION_NAME).await;
-            if proto_handler.is_err() {
-                tracing::error!("{}", proto_handler.unwrap_err());
-                std::process::exit(1);
+            match init_amqp_proto_handlers(&configuration.broker, APPLICATION_NAME).await {
+                Ok((publish_proto_handler, subscribe_proto_handler)) => {
+                    begin_execution(
+                        configuration,
+                        publish_proto_handler,
+                        subscribe_proto_handler,
+                    )
+                    .await
+                }
+                Err(err) => {
+                    tracing::error!("AMQP broker: initial verification problem -- {err}");
+                    std::process::exit(1);
+                }
             }
-            begin_execution(configuration, proto_handler.unwrap()).await
         }
         intersect_ingress_proxy_common::configuration::Protocol::Mqtt => {
-            let proto_handler =
-                MqttProtoHandler::new(&configuration.broker, APPLICATION_NAME).await;
-            if proto_handler.is_err() {
-                tracing::error!("{}", proto_handler.unwrap_err());
-                std::process::exit(1);
+            match init_mqtt_proto_handlers(&configuration.broker, APPLICATION_NAME).await {
+                Ok((publish_proto_handler, subscribe_proto_handler)) => {
+                    begin_execution(
+                        configuration,
+                        publish_proto_handler,
+                        subscribe_proto_handler,
+                    )
+                    .await
+                }
+                Err(err) => {
+                    tracing::error!("MQTT broker: initial verification problem -- {err}");
+                    std::process::exit(1);
+                }
             }
-            begin_execution(configuration, proto_handler.unwrap()).await
         }
     }
 }
