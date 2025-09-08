@@ -13,9 +13,12 @@ pub trait HttpBroadcast {
 }
 
 /// Trait which determines how to publish a message. Should usually show up as a reaction to receiving an HTTP event or request.
-/// Note that whatever implements PublishProtoHandler should generally implement Clone as well.
+/// Note that whatever implements `PublishProtoHandler` should generally implement Clone as well.
 pub trait PublishProtoHandler {
     /// this is meant to verify errors in the message before publishing
+    ///
+    /// # Errors
+    ///   - return an error message if message verification failed.
     fn preverify_publish(&self, topic: &str) -> Result<(), String>;
     /// the assumption is that once this function is called, all faults lie in the broker (and not the parameters)
     fn publish_message(
@@ -27,8 +30,8 @@ pub trait PublishProtoHandler {
 
 /// Trait which determines how to subscribe to a message. Usually runs in its own thread and uses an [`HttpBroadcast`] to send the message over an HTTP channel.
 pub trait SubscribeProtoHandler {
-    /// this should start a subscribe loop in a tokio::spawn thread, and return the JoinHandle.
-    /// this consumes the ProtoHandler itself after being called.
+    /// this should start a subscribe loop in a [`tokio::spawn`] thread, and return the [`tokio::task::JoinHandle`] .
+    /// this consumes the `SubscribeProtoHandler` itself after being called.
     fn begin_subscribe_loop(
         self,
         config_topic: String,

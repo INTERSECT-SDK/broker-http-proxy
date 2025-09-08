@@ -6,7 +6,7 @@ use crate::protocols::proxy::is_routing_key_compliant;
 #[derive(Clone)]
 pub struct MqttPublishProtoHandler {
     mqtt_client: AsyncClient,
-    /// application_name is used for the hardcoded queue name and for debugging purposes
+    /// `application_name` is used for the hardcoded queue name and for debugging purposes
     application_name: &'static str,
 }
 
@@ -19,6 +19,7 @@ impl std::fmt::Debug for MqttPublishProtoHandler {
 }
 
 impl MqttPublishProtoHandler {
+    #[must_use]
     pub fn new(application_name: &'static str, mqtt_client: AsyncClient) -> Self {
         MqttPublishProtoHandler {
             mqtt_client,

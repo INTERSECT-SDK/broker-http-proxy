@@ -8,6 +8,9 @@ use crate::{
 };
 
 /// Sets up the AMQP proto handlers, and verifies that we can connect to the AMQP broker.
+///
+/// # Errors
+///   - If we can't make an initial connection to the broker, return Err.
 pub async fn init_amqp_proto_handlers(
     broker_config: &BrokerSettings,
     application_name: &'static str,

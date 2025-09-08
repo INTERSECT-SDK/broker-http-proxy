@@ -13,7 +13,7 @@ use crate::{
 pub struct MqttSubscribeProtoHandler {
     mqtt_client: AsyncClient,
     mqtt_event_loop: EventLoop,
-    /// application_name is used for the hardcoded queue name and for debugging purposes
+    /// `application_name` is used for the hardcoded queue name and for debugging purposes
     application_name: &'static str,
 }
 
@@ -108,7 +108,7 @@ async fn broker_consumer_loop_inner(
                                 break false;
                             },
                             () = &mut retry_wait => {
-                                continue;
+                                // no-op
                             },
                         }
                     },

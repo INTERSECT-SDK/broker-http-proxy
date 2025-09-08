@@ -10,7 +10,7 @@ use crate::{
 #[derive(Clone)]
 pub struct AmqpPublishProtoHandler {
     pool: Pool,
-    /// application_name is used for the hardcoded queue name and for debugging purposes
+    /// `application_name` is used for the hardcoded queue name and for debugging purposes
     application_name: &'static str,
 }
 
@@ -23,6 +23,7 @@ impl std::fmt::Debug for AmqpPublishProtoHandler {
 }
 
 impl AmqpPublishProtoHandler {
+    #[must_use]
     pub fn new(pool: Pool, application_name: &'static str) -> Self {
         Self {
             pool,
