@@ -1,6 +1,6 @@
 [package]
 name = "proxy-http-server"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 publish = false
 default-run = "proxy-http-server"
@@ -15,8 +15,8 @@ name = "proxy-http-server"
 [dependencies]
 anyhow = { workspace = true }
 async-stream = { workspace = true }
-deadpool-amqprs = { workspace = true }
 futures = { workspace = true }
+rumqttc = { workspace = true }
 secrecy = { workspace = true }
 serde = { workspace = true }
 serde-aux = { workspace = true }

@@ -12,6 +12,7 @@ amqprs = { version = "2", features = ["traces"] }
 config = { version = "0.14", default-features = false, features = ["yaml"] }  # TODO check to see why this can't be upgraded to v15
 deadpool-amqprs = "0.3"
 futures = "0.3"
+rumqttc = "0.24.0"
 secrecy = { version = "0.10", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 serde-aux = "4"

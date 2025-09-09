@@ -5,7 +5,12 @@ broker:
   password: intersect_password
   host: "127.0.0.1"
   # note: differs from other config file (two separate brokers used)
+  # -- IF AMQP --
   port: 5672
+  protocol: "amqp"
+  # -- IF MQTT --
+  #port: 1883
+  #protocol: "mqtt"
 # use amqp topic notation
 topic_prefix: "organization.facility.system"  # CHANGE THIS PER DEPLOYMENT!!!
 log_level: "debug"

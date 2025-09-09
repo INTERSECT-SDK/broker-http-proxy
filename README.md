@@ -56,7 +56,7 @@ Caveats:
 - while you can have a `client` and a `server` application for both systems, you should only have one of the clients talk to the other's server. Don't connect both clients to both servers.
 
 
-Currently only supports AMQP 0-9-1 as the broker protocol but can potentially support others in the future
+Currently only supports AMQP 0-9-1 and MQTT 3-1-1 as the broker protocols, but can potentially support others in the future
 
 ## Why Rust?
 
@@ -84,7 +84,7 @@ Specific configuration structs are in `proxy-http-server/src/configuration.rs` a
 
 ## Setup
 
-### Using the RabbitMQ web management UIs
+### Using the RabbitMQ web management UIs (AMQP)
 
 These instructions assume you are using the docker compose configuration and the default `conf.yaml` configurations for each.
 
@@ -92,7 +92,10 @@ These instructions assume you are using the docker compose configuration and the
 2) Make sure that you have both applications started (do NOT start more than 1 of each). Each application should be connected to a separate broker.
 3) To login to the broker that the server instance uses, go to localhost:15672, username `intersect_username`, password `intersect_password`
 4) To login to the broker that the client instance uses, go to localhost:15673, username `intersect_username`, password `intersect_password`
-5) On each application, click on the `Exchanges` tab, and click on the `intersect-messages` exchange.
+5)
+    - IF AMQP: On each application, click on the `Exchanges` tab, and click on the `intersect-messages` exchange.
+    - IF MQTT: On each application, click on the `Queues and Streams` tab, then click on the queue (it should look like `mqtt-subscription-proxy-http-clientqos1` or `mqtt-subscription-proxy-http-serverqos1`).
+
 6) Make sure that the `Publish message` dropdown is expanded, select the large text area which is labeled with `Payload:`
 
 For the application on `localhost:15672`, set the payload to below (no newlines):
@@ -145,3 +148,7 @@ Now it's advisable to [run some INTERSECT-SDK examples](https://github.com/INTER
 - one exchange for all messages for each application (see `shared-deps/src/protocols/amqp/mod.rs` to get name)
 - routing keys will match SDK naming schematics (SOS hierarchy, "." as separator, end with ".{userspace|lifecycle|events}"). The routing key will roughly correspond to the `destination` field in an INTERSECT message, but the `destination` field only exists on userspace messages (event/lifecycle messages do not have a specific destination in mind).
 - The queue name is hardcoded to match the name of the application.
+
+## MQTT setup
+
+- follows similar rationale to AMQP, except does not utilize exchanges.

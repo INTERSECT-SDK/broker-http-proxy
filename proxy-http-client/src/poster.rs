@@ -1,6 +1,6 @@
 use secrecy::ExposeSecret;
 
-use intersect_ingress_proxy_common::protocols::amqp::subscribe::HttpBroadcast;
+use intersect_ingress_proxy_common::protocols::interfaces::HttpBroadcast;
 use intersect_ingress_proxy_common::server_paths::PUBLISH_URL;
 
 use crate::configuration::ExternalProxy;
@@ -29,10 +29,9 @@ impl HttpBroadcast for Poster {
             .body(event)
             .send()
             .await;
-        if result.is_ok() {
-            let result = result.unwrap();
-            let status = result.status().as_u16();
-            match result.bytes().await {
+        if let Ok(response) = result {
+            let status = response.status().as_u16();
+            match response.bytes().await {
                 Ok(bytes) => tracing::debug!("{:?}", bytes),
                 Err(err) => tracing::debug!("ERROR: {}", err.to_string()),
             }
