@@ -20,7 +20,7 @@ serde_json = { version = "1", features = ["raw_value"] }
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["registry", "env-filter"] }
+tracing-subscriber = { version = "0.3.20", features = ["registry", "env-filter"] }
 uuid = { version = "1", features = ["v4"] }
 
 [workspace.package]
