@@ -14,9 +14,8 @@ use std::sync::Arc;
 use crate::webapp_state::WebApplicationState;
 use intersect_ingress_proxy_common::signals::wait_for_os_signal;
 
-#[allow(clippy::needless_pass_by_value)]
 fn sse_response(
-    app_state: Arc<impl WebApplicationState>,
+    app_state: &Arc<impl WebApplicationState>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let mut rx = app_state.get_broadcaster().add_client();
 
@@ -65,5 +64,5 @@ pub async fn sse_handler(
     {
         return (StatusCode::UNAUTHORIZED, "unauthorized").into_response();
     }
-    sse_response(app_state).into_response()
+    sse_response(&app_state).into_response()
 }
