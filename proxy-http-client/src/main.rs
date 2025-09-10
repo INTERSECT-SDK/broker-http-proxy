@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tokio::sync::oneshot;
 
-use intersect_ingress_proxy_common::configuration::get_configuration;
+use intersect_ingress_proxy_common::configuration::{get_configuration, Protocol};
 use intersect_ingress_proxy_common::protocols::{
     amqp::init::init_amqp_proto_handlers,
     interfaces::{PublishProtoHandler, SubscribeProtoHandler},
@@ -71,7 +71,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     match configuration.broker.protocol {
-        intersect_ingress_proxy_common::configuration::Protocol::Amqp => {
+        Protocol::Amqp => {
             match init_amqp_proto_handlers(&configuration.broker, APPLICATION_NAME).await {
                 Ok((publish_proto_handler, subscribe_proto_handler)) => {
                     begin_execution(
@@ -87,7 +87,7 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
-        intersect_ingress_proxy_common::configuration::Protocol::Mqtt => {
+        Protocol::Mqtt => {
             match init_mqtt_proto_handlers(&configuration.broker, APPLICATION_NAME).await {
                 Ok((publish_proto_handler, subscribe_proto_handler)) => {
                     begin_execution(

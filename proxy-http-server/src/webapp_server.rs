@@ -53,26 +53,18 @@ fn get_router<S: WebApplicationState + Send + Sync + 'static>(initial_state: S) 
         .fallback(handler_404)
 }
 
-pub trait WebApplication {
-    fn port(&self) -> u16;
-    fn run_until_stopped(
-        self,
-    ) -> impl std::future::Future<Output = Result<(), std::io::Error>> + Send;
-}
-
-pub struct AmqpWebApplication {
+pub struct WebApplication {
     port: u16,
     server: WebAppServer,
 }
 
-impl AmqpWebApplication {
+impl WebApplication {
     ///
     /// # Errors
     ///   - errors if unable to bind to provided TCP port
     pub async fn build(
         configuration: &Settings,
-        broadcaster: Arc<Broadcaster>,
-        proto_handler: AmqpPublishProtoHandler,
+        initial_state: impl WebApplicationState + Send + Sync + 'static,
     ) -> Result<Self, anyhow::Error> {
         let address = format!(
             "{}:{}",
@@ -85,29 +77,23 @@ impl AmqpWebApplication {
         );
         let listener = TcpListener::bind(address).await?;
         let port = listener.local_addr()?.port();
-        let router = get_router(AmqpWebApplicationState {
-            proto_handler: proto_handler.clone(),
-            broadcaster,
-            username: configuration.username.clone(),
-            password: configuration.password.clone(),
-        });
+
+        let router = get_router(initial_state);
         let server = axum::serve(listener, router);
 
         tracing::info!("Web server is running on port {}", port);
 
         Ok(Self { port, server })
     }
-}
 
-impl WebApplication for AmqpWebApplication {
-    fn port(&self) -> u16 {
+    pub fn port(&self) -> u16 {
         self.port
     }
 
     ///
     /// # Errors
     ///   - Errors if unable to initialize web server
-    async fn run_until_stopped(self) -> Result<(), std::io::Error> {
+    pub async fn run_until_stopped(self) -> Result<(), std::io::Error> {
         // the return type of "with_graceful_shutdown" is unstable, so set it up here
         self.server
             .with_graceful_shutdown(wait_for_os_signal())
@@ -115,57 +101,42 @@ impl WebApplication for AmqpWebApplication {
     }
 }
 
-pub struct MqttWebApplication {
-    port: u16,
-    server: WebAppServer,
-}
-
-impl MqttWebApplication {
-    ///
-    /// # Errors
-    ///   - errors if unable to bind to provided TCP port
-    pub async fn build(
-        configuration: &Settings,
-        broadcaster: Arc<Broadcaster>,
-        proto_handler: MqttPublishProtoHandler,
-    ) -> Result<Self, anyhow::Error> {
-        let address = format!(
-            "{}:{}",
-            if configuration.production {
-                "0.0.0.0"
-            } else {
-                "127.0.0.1"
-            },
-            configuration.app_port
-        );
-        let listener = TcpListener::bind(address).await?;
-        let port = listener.local_addr()?.port();
-        let router = get_router(MqttWebApplicationState {
-            proto_handler: proto_handler.clone(),
+///
+/// # Errors
+///   - errors if unable to bind to provided TCP port in configuration
+pub async fn build_amqp_webapp(
+    configuration: &Settings,
+    broadcaster: Arc<Broadcaster>,
+    proto_handler: AmqpPublishProtoHandler,
+) -> Result<WebApplication, anyhow::Error> {
+    WebApplication::build(
+        configuration,
+        AmqpWebApplicationState {
+            proto_handler,
             broadcaster,
             username: configuration.username.clone(),
             password: configuration.password.clone(),
-        });
-        let server = axum::serve(listener, router);
-
-        tracing::info!("Web server is running on port {}", port);
-
-        Ok(Self { port, server })
-    }
+        },
+    )
+    .await
 }
 
-impl WebApplication for MqttWebApplication {
-    fn port(&self) -> u16 {
-        self.port
-    }
-
-    ///
-    /// # Errors
-    ///   - Errors if unable to initialize web server
-    async fn run_until_stopped(self) -> Result<(), std::io::Error> {
-        // the return type of "with_graceful_shutdown" is unstable, so set it up here
-        self.server
-            .with_graceful_shutdown(wait_for_os_signal())
-            .await
-    }
+///
+/// # Errors
+///   - errors if unable to bind to provided TCP port in configuration
+pub async fn build_mqtt_webapp(
+    configuration: &Settings,
+    broadcaster: Arc<Broadcaster>,
+    proto_handler: MqttPublishProtoHandler,
+) -> Result<WebApplication, anyhow::Error> {
+    WebApplication::build(
+        configuration,
+        MqttWebApplicationState {
+            proto_handler,
+            broadcaster,
+            username: configuration.username.clone(),
+            password: configuration.password.clone(),
+        },
+    )
+    .await
 }

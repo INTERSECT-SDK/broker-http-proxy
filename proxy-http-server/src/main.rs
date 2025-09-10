@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tokio::sync::oneshot;
 
-use intersect_ingress_proxy_common::configuration::get_configuration;
+use intersect_ingress_proxy_common::configuration::{get_configuration, Protocol};
 use intersect_ingress_proxy_common::protocols::{
     amqp::init::init_amqp_proto_handlers, interfaces::SubscribeProtoHandler,
     mqtt::init::init_mqtt_proto_handlers,
@@ -14,7 +14,7 @@ use intersect_ingress_proxy_common::telemetry::{
 use proxy_http_server::{
     broadcaster::Broadcaster,
     configuration::Settings,
-    webapp_server::{AmqpWebApplication, MqttWebApplication, WebApplication},
+    webapp_server::{build_amqp_webapp, build_mqtt_webapp, WebApplication},
     APPLICATION_NAME,
 };
 
@@ -26,7 +26,7 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 async fn begin_execution(
     configuration: Settings,
     subscribe_proto_handler: impl SubscribeProtoHandler,
-    application: impl WebApplication,
+    application: WebApplication,
     broadcaster: Arc<Broadcaster>,
 ) -> anyhow::Result<()> {
     // How this works:
@@ -73,10 +73,10 @@ async fn main() -> anyhow::Result<()> {
     let broadcaster = Broadcaster::new();
 
     match configuration.broker.protocol {
-        intersect_ingress_proxy_common::configuration::Protocol::Amqp => {
+        Protocol::Amqp => {
             match init_amqp_proto_handlers(&configuration.broker, APPLICATION_NAME).await {
                 Ok((publish_proto_handler, subscribe_proto_handler)) => {
-                    let web_server = AmqpWebApplication::build(
+                    let web_server = build_amqp_webapp(
                         &configuration,
                         broadcaster.clone(),
                         publish_proto_handler,
@@ -96,10 +96,10 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
-        intersect_ingress_proxy_common::configuration::Protocol::Mqtt => {
+        Protocol::Mqtt => {
             match init_mqtt_proto_handlers(&configuration.broker, APPLICATION_NAME).await {
                 Ok((publish_proto_handler, subscribe_proto_handler)) => {
-                    let web_server = MqttWebApplication::build(
+                    let web_server = build_mqtt_webapp(
                         &configuration,
                         broadcaster.clone(),
                         publish_proto_handler,
