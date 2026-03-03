@@ -101,8 +101,8 @@ spec:
               {{- if .Values.app.broker.password.isSecret }}
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.app.broker.password.secretName }}
-                  key: {{ .Values.app.broker.password.secretKey }}
+                  name: {{ .Values.app.broker.password.secretName | quote }}
+                  key: {{ .Values.app.broker.password.secretKey | quote }}
               {{- else }}
               value: {{ .Values.app.broker.password.hardcoded | quote }}
               {{- end }}
@@ -119,7 +119,14 @@ spec:
             - name: PROXYAPP_USERNAME
               value: {{ .Values.app.username | quote }}
             - name: PROXYAPP_PASSWORD
-              value: {{ .Values.app.password | quote }}
+              {{- if .Values.app.password.isSecret }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.password.secretName | quote }}
+                  key: {{ .Values.app.password.secretKey | quote }}
+              {{- else }}
+              value: {{ .Values.app.password.hardcoded | quote }}
+              {{- end }}
           envFrom:
             {{- if .Values.extraEnvVarsCM }}
             - configMapRef:

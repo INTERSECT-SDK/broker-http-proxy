@@ -98,8 +98,8 @@ spec:
               {{- if .Values.app.broker.password.isSecret }}
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.app.broker.password.secretName }}
-                  key: {{ .Values.app.broker.password.secretKey }}
+                  name: {{ .Values.app.broker.password.secretName | quote }}
+                  key: {{ .Values.app.broker.password.secretKey | quote }}
               {{- else }}
               value: {{ .Values.app.broker.password.hardcoded | quote }}
               {{- end }}
@@ -114,7 +114,14 @@ spec:
             - name: PROXYAPP_OTHER_PROXY__USERNAME
               value: {{ .Values.app.other_proxy.username | quote }}
             - name: PROXYAPP_OTHER_PROXY__PASSWORD
-              value: {{ .Values.app.other_proxy.password | quote }}
+              {{- if .Values.app.other_proxy.password.isSecret }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.other_proxy.password.secretName | quote }}
+                  key: {{ .Values.app.other_proxy.password.secretKey | quote }}
+              {{- else }}
+              value: {{ .Values.app.other_proxy.password.hardcoded | quote }}
+              {{- end }}
             - name: PROXYAPP_TOPIC_PREFIX
               value: {{ required "app.topic_prefix not set (i.e. 'organization.facility.system.')" .Values.app.topic_prefix | quote }}
           envFrom:
