@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use rumqttc::{AsyncClient, MqttOptions};
+use rumqttc::v5::{AsyncClient, MqttOptions};
 use secrecy::ExposeSecret;
 
 use crate::{
@@ -29,8 +29,8 @@ pub async fn init_mqtt_proto_handlers(
         broker_config.password.expose_secret(),
     );
     // TODO may want to handle message sizes >= 4 GiB
-    mqtt_options.set_max_packet_size(1 << 32, 1 << 32);
-    mqtt_options.set_clean_session(false);
+    mqtt_options.set_max_packet_size(Some(u32::MAX));
+    mqtt_options.set_clean_start(false);
     // TODO - implement manual acks
     // mqtt_options.set_manual_acks(true);
     mqtt_options.set_keep_alive(Duration::from_secs(60));
@@ -41,9 +41,9 @@ pub async fn init_mqtt_proto_handlers(
     match mqtt_event_loop.poll().await {
         Ok(event) => {
             match event {
-                rumqttc::Event::Incoming(packet) => {
+                rumqttc::v5::Event::Incoming(packet) => {
                     match packet {
-                        rumqttc::Packet::ConnAck(conn_ack) => {
+                        rumqttc::v5::mqttbytes::v5::Packet::ConnAck(conn_ack) => {
                             // expected
                             tracing::info!("Connected -- {conn_ack:?}");
                         }
@@ -53,7 +53,7 @@ pub async fn init_mqtt_proto_handlers(
                         }
                     }
                 }
-                rumqttc::Event::Outgoing(outgoing) => {
+                rumqttc::v5::Event::Outgoing(outgoing) => {
                     // all of these are unexpected, this should probably not be seen but shouldn't be fatal
                     tracing::warn!("unexpected initial outgoing event -- {outgoing:?}");
                 }

@@ -1,4 +1,5 @@
-use rumqttc::{AsyncClient, QoS};
+use rumqttc::v5::mqttbytes::QoS;
+use rumqttc::v5::AsyncClient;
 
 use crate::protocols::interfaces::PublishProtoHandler;
 use crate::protocols::proxy::is_routing_key_compliant;

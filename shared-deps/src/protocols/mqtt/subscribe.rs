@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use tokio::sync::oneshot::Receiver;
 
-use rumqttc::{AsyncClient, EventLoop, Publish};
+use rumqttc::v5::mqttbytes::v5::Publish;
+use rumqttc::v5::{AsyncClient, EventLoop};
 
 use crate::{
     intersect_messaging::{make_eventsource_data, should_message_passthrough},
@@ -76,9 +77,9 @@ async fn broker_consumer_loop_inner(
                 match event_loop_pool {
                     Ok(event) => {
                         match event {
-                            rumqttc::Event::Incoming(packet) => {
+                            rumqttc::v5::Event::Incoming(packet) => {
                                 match packet {
-                                    rumqttc::Packet::Publish(publish_packet) => {
+                                    rumqttc::v5::mqttbytes::v5::Packet::Publish(publish_packet) => {
                                         consume_message(
                                             publish_packet,
                                             &mqtt_client,
@@ -92,7 +93,7 @@ async fn broker_consumer_loop_inner(
                                     },
                                 }
                             },
-                            rumqttc::Event::Outgoing(outgoing) => {
+                            rumqttc::v5::Event::Outgoing(outgoing) => {
                                 tracing::debug!("Outgoing packet -- {outgoing:?}");
                             },
                         }
@@ -148,29 +149,36 @@ async fn consume_message(
                     );
                 }
                 Ok(true) => {
-                    let topic = mqtt_topic_to_proxy_topic(&publish_packet.topic);
-                    match make_eventsource_data(&topic, &utf8_data) {
-                        Err(_) => {}
-                        Ok(event) => {
-                            tracing::debug!(
-                                "Consume message {}, data: {}",
-                                publish_packet.pkid,
-                                event
-                            );
-                            // TODO handle this better later, see broadcast() documentation for details.
-                            tokio::select! {
-                                _ = killswitch => {
-                                    // WARNING: in the client implementation, this may happen while waiting on a response, resulting in us rejecting a message we actually passed through successfully
-                                    // this would only happen if we actually call publish_event_to_http(), if the killswitch was toggled before reaching here we will always do the killswitch branch.
-                                    tracing::warn!("Got message from broker but did not send it over HTTP, the message will be rejected.");
-                                    should_ack = false;
-                                },
-                                http_result = broadcaster.publish_event_to_http(event) => {
-                                    if !http_result {
-                                        tracing::warn!("Some clients may not have gotten a message, the message will be rejected.");
-                                        should_ack = false;
+                    match str::from_utf8(&publish_packet.topic) {
+                        Err(e) => {
+                            tracing::warn!(error = ?e, "message topic is not valid UTF-8, cannot be forwarded over SSE");
+                        }
+                        Ok(topic) => {
+                            let topic = mqtt_topic_to_proxy_topic(topic);
+                            match make_eventsource_data(&topic, &utf8_data) {
+                                Err(_) => {}
+                                Ok(event) => {
+                                    tracing::debug!(
+                                        "Consume message {}, data: {}",
+                                        publish_packet.pkid,
+                                        event
+                                    );
+                                    // TODO handle this better later, see broadcast() documentation for details.
+                                    tokio::select! {
+                                        _ = killswitch => {
+                                            // WARNING: in the client implementation, this may happen while waiting on a response, resulting in us rejecting a message we actually passed through successfully
+                                            // this would only happen if we actually call publish_event_to_http(), if the killswitch was toggled before reaching here we will always do the killswitch branch.
+                                            tracing::warn!("Got message from broker but did not send it over HTTP, the message will be rejected.");
+                                            should_ack = false;
+                                        },
+                                        http_result = broadcaster.publish_event_to_http(event) => {
+                                            if !http_result {
+                                                tracing::warn!("Some clients may not have gotten a message, the message will be rejected.");
+                                                should_ack = false;
+                                            }
+                                        },
                                     }
-                                },
+                                }
                             }
                         }
                     }

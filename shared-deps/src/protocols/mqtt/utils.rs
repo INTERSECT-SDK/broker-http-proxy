@@ -1,4 +1,5 @@
-use rumqttc::{AsyncClient, QoS};
+use rumqttc::v5::mqttbytes::QoS;
+use rumqttc::v5::AsyncClient;
 
 pub(crate) async fn subscribe_all(mqtt_client: &AsyncClient) -> Result<(), String> {
     mqtt_client
