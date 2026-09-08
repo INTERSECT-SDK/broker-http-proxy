@@ -37,7 +37,7 @@ pub async fn event_source_loop(
 ) -> i32 {
     let mut es = EventSource::new(
         reqwest::Client::new()
-            .get(format!("{}{}", &other_proxy.url, SUBSCRIBE_URL))
+            .get(format!("{}{}", other_proxy.url, SUBSCRIBE_URL))
             .basic_auth(
                 &other_proxy.username,
                 Some(&other_proxy.password.expose_secret()),

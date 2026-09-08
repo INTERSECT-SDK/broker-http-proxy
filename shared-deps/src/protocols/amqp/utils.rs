@@ -68,7 +68,7 @@ pub(crate) async fn verify_connection_pool(
         .map_err(|_| {
             format!(
                 "Couldn't bind the {} exchange to the {} queue",
-                INTERSECT_MESSAGE_EXCHANGE, &queue_name
+                INTERSECT_MESSAGE_EXCHANGE, queue_name
             )
         })?;
     channel
